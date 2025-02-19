@@ -3,7 +3,7 @@
 
 # Night Todo Application
 
-NightTodo is a sleek and modern dark-themed Todo application built with Java, Spring Boot, Maven, and Thymeleaf. It provides a simple interface to manage your daily tasks while demonstrating a robust multi-stage Docker build process for containerized deployment.
+Night Todo Application is a sleek, modern, and dark-themed Todo application built with Java, Spring Boot, Maven, and Thymeleaf. It offers a straightforward interface to manage your daily tasks and showcases a robust multi-stage Docker build process for containerized deployment.
 
 ## Features
 
@@ -22,9 +22,10 @@ NightTodo is a sleek and modern dark-themed Todo application built with Java, Sp
 
 ## Prerequisites
 
-- **Java 17 or later**
-- **Maven 3.8.5 or later**
+- **Java 17** or later
+- **Maven 3.8.5** or later
 - **Docker** (optional, for containerization)
+- **Docker Compose** (if using the provided `docker-compose.yml`)
 
 ## Running Locally
 
@@ -43,7 +44,7 @@ NightTodo is a sleek and modern dark-themed Todo application built with Java, Sp
 
    The application will start and be accessible at [http://localhost:8081](http://localhost:8081).
 
-### Building the Application JAR
+## Building the Application JAR
 
 To package the application as an executable JAR file, run:
 
@@ -55,25 +56,41 @@ After the build, the packaged JAR will be located in the `target` directory (e.g
 
 ## Docker
 
-This project includes a multi-stage Dockerfile to build and run the application in a container.
+This project includes both a multi-stage `Dockerfile` and a `docker-compose.yml` file to build and run the application in a containerized environment.
 
-### Building the Docker Image
+### Using the Dockerfile
 
-From the project root, build the Docker image with:
+#### Building the Docker Image
+
+From the project root, run:
 
 ```bash
 docker build -t night-todo-application .
 ```
 
-### Running the Docker Container
+#### Running the Docker Container
 
-Run the Docker container by mapping the container's port to your host:
+Map the container's port to your host with:
 
 ```bash
 docker run -p 8081:8081 night-todo-application
 ```
 
-The application will then be accessible at [http://localhost:8081](http://localhost:8081).
+The application will be accessible at [http://localhost:8081](http://localhost:8081).
+
+### Using Docker Compose
+
+Docker Compose makes it even easier to manage the container lifecycle. From the project root, run:
+
+```bash
+docker-compose up --build
+```
+
+This command will build the image (if needed) and start the container, making the application available at [http://localhost:8081](http://localhost:8081). To stop the container, use:
+
+```bash
+docker-compose down
+```
 
 ## Configuration
 
