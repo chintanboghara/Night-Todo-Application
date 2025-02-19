@@ -1,0 +1,8 @@
+version: "3.8"
+
+services:
+  night-todo:
+    build: .
+    ports:
+      - "8081:8081"
+    container_name: night-todo-application
