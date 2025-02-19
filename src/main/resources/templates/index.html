@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo Application</title>
+  <link rel="stylesheet" type="text/css" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Todo List</h1>
+    <form action="/add" method="post">
+      <input type="text" name="title" placeholder="Enter a new todo" required>
+      <button type="submit">Add</button>
+    </form>
+    <ul>
+      <li th:each="todo : ${todos}">
+        <span th:text="${todo.title}" 
+              th:classappend="${todo.completed} ? 'completed' : ''"></span>
+        <form th:action="@{/complete}" method="post" style="display:inline;">
+          <input type="hidden" name="id" th:value="${todo.id}">
+          <button type="submit">Complete</button>
+        </form>
+        <form th:action="@{/delete}" method="post" style="display:inline;">
+          <input type="hidden" name="id" th:value="${todo.id}">
+          <button type="submit">Delete</button>
+        </form>
+      </li>
+    </ul>
+  </div>
+</body>
+</html>
