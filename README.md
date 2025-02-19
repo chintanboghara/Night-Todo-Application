@@ -1,3 +1,6 @@
+[![Docker Image CI](https://github.com/chintanboghara/Night-Todo-Application/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/chintanboghara/Night-Todo-Application/actions/workflows/docker-image.yml)
+[![Java CI](https://github.com/chintanboghara/Night-Todo-Application/actions/workflows/Java%20CI.yml/badge.svg?branch=main)](https://github.com/chintanboghara/Night-Todo-Application/actions/workflows/Java%20CI.yml)
+
 # Night Todo Application
 
 NightTodo is a sleek and modern dark-themed Todo application built with Java, Spring Boot, Maven, and Thymeleaf. It provides a simple interface to manage your daily tasks while demonstrating a robust multi-stage Docker build process for containerized deployment.
