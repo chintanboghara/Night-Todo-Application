@@ -24,11 +24,11 @@ Build and run the Night Todo Application using Cloud Native Buildpacks.
   Use the following command to create a container image. Cloud Native Buildpacks will automatically detect your Java Spring Boot application and build it accordingly.
 
   ```bash
-  pack build night-todo-app --builder paketobuildpacks/builder:base
+  pack build night-todo-application --builder paketobuildpacks/builder:base
   ```
 
   **Notes:**
-  - `night-todo-app` is the name you are assigning to your container image.
+  - `night-todo-application` is the name you are assigning to your container image.
   - `--builder paketobuildpacks/builder:base` specifies the builder that supports Java applications. You can choose a different builder (like `paketobuildpacks/builder:tiny`) if you prefer a smaller image.
 
 ## 3. Run the Container
@@ -37,7 +37,7 @@ Build and run the Night Todo Application using Cloud Native Buildpacks.
   Once the image is built, run it with Docker:
 
   ```bash
-  docker run -p 8081:8081 night-todo-app
+  docker run -p 8081:8081 night-todo-application
   ```
 
   **Explanation:**
