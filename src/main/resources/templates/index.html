@@ -15,6 +15,10 @@
       color: red;
       /* font-weight: bold; */
     }
+    .task-completed span { /* Apply to the span holding the title */
+        text-decoration: line-through;
+        color: #6c757d; /* Bootstrap's gray color */
+    }
     .task-meta {
       font-size: 0.9em;
       color: #777;
@@ -22,6 +26,11 @@
     }
     .task-actions {
       margin-top: 5px;
+    }
+    .subtask-list {
+        margin-left: 20px; /* Indentation for subtasks */
+        padding-left: 0; /* Remove default ul padding */
+        list-style-type: none; /* Remove bullets for sub-list if it's a ul */
     }
     .button-link {
       display: inline-block;
@@ -87,30 +96,50 @@
       </div>
       <button type="submit">Add</button>
     </form>
-    <ul>
-      <li th:each="todo : ${todos}" th:classappend="${todo.overdue} ? 'task-overdue' : ''">
-        <span th:text="${todo.title}"
-              th:classappend="${todo.completed} ? 'completed' : ''"></span>
-        <div class="task-meta">
-             <small th:if="${todo.dueDate}">Due: <span th:text="${#temporals.format(todo.dueDate, 'MMM dd, yyyy')}"></span></small>
-             <span th:if="${todo.priority}" class="badge"
-                   th:text="${todo.priority.name().substring(0,1) + todo.priority.name().substring(1).toLowerCase()}"
-                   th:classappend="${ #strings.toString(todo.priority) == 'HIGH' ? 'badge-danger' : (#strings.toString(todo.priority) == 'MEDIUM' ? 'badge-warning' : 'badge-info')}">
-             </span>
-        </div>
-        <div class="task-actions">
-            <form th:action="@{/complete}" method="post" style="display:inline;">
-              <input type="hidden" name="id" th:value="${todo.id}" />
-              <button type="submit" th:if="${!todo.completed}">Complete</button>
-            </form>
-            <a th:href="@{/edit/{id}(id=${todo.id})}" class="button-link">Edit</a>
-            <form th:action="@{/delete}" method="post" style="display:inline;">
-              <input type="hidden" name="id" th:value="${todo.id}" />
-              <button type="submit">Delete</button>
-            </form>
-        </div>
-      </li>
-    </ul>
+
+    <!-- Task List Fragment Definition -->
+    <div th:fragment="taskList(tasksToDisplay, isSubtask)" th:remove="tag">
+        <ul th:class="${isSubtask} ? 'subtask-list list-unstyled' : 'list-unstyled'">
+            <li th:each="task : ${tasksToDisplay}"
+                th:id="'task-' + ${task.id}"
+                th:classappend="${task.overdue ? 'task-overdue' : ''} + ' ' + ${task.completed ? 'task-completed' : ''}">
+
+                <span th:text="${task.title}"
+                      th:classappend="${task.completed} ? 'completed' : ''"></span> <!-- 'completed' class on span for strikethrough -->
+
+                <div class="task-meta">
+                    <small th:if="${task.dueDate}">Due: <span th:text="${#temporals.format(task.dueDate, 'MMM dd, yyyy')}"></span></small>
+                    <span th:if="${task.priority}" class="badge"
+                          th:text="${task.priority.name().substring(0,1) + task.priority.name().substring(1).toLowerCase()}"
+                          th:classappend="${ #strings.toString(task.priority) == 'HIGH' ? 'badge-danger' : (#strings.toString(task.priority) == 'MEDIUM' ? 'badge-warning' : 'badge-info')}">
+                    </span>
+                    <small th:if="${task.parent}" class="ml-2">(Subtask of: <span th:text="${task.parent.title}"></span>)</small>
+                </div>
+
+                <div class="task-actions">
+                    <form th:action="@{/complete}" method="post" style="display:inline;">
+                        <input type="hidden" name="id" th:value="${task.id}" />
+                        <button type="submit" th:if="${!task.completed}" class="btn btn-sm btn-outline-secondary mr-1">Complete</button>
+                    </form>
+                    <a th:href="@{/edit/{id}(id=${task.id})}" class="btn btn-sm btn-outline-primary mr-1">Edit</a>
+                    <a th:href="@{/task/{parentId}/addSubTask(parentId=${task.id})}" class="btn btn-sm btn-outline-success mr-1">Add Subtask</a>
+                    <form th:action="@{/delete}" method="post" style="display:inline;">
+                        <input type="hidden" name="id" th:value="${task.id}" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </div>
+
+                <!-- Recursively include subtasks -->
+                <div th:if="${!task.subTasks.isEmpty()}">
+                    <div th:replace="~{index :: taskList(tasksToDisplay=${task.subTasks}, isSubtask=true)}"></div>
+                </div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Initial call to the task list fragment for top-level todos -->
+    <div th:replace="~{index :: taskList(tasksToDisplay=${todos}, isSubtask=false)}"></div>
+
   </div>
 </body>
 </html>

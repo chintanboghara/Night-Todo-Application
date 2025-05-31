@@ -273,4 +273,165 @@ public class TodoControllerIntegrationTest {
                 .andExpect(xpath("//li[contains(.,'Upcoming Task') and not(contains(@class, 'task-overdue'))]").exists())
                 .andExpect(xpath("//li[contains(.,'Upcoming Task')]//span[contains(@class, 'badge-info') and text()='Low']").exists());
     }
+
+    // --- Subtask Tests ---
+
+    @Test
+    void testGetAddSubTaskForm_shouldShowForm_whenParentExists() throws Exception {
+        Todo parentTask = todoRepository.save(new Todo(0L, "Parent Task for Subtask", false, null, Priority.MEDIUM));
+        Long parentId = parentTask.getId();
+
+        mockMvc.perform(get("/task/" + parentId + "/addSubTask"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("add-subtask"))
+                .andExpect(model().attributeExists("parentTask"))
+                .andExpect(model().attribute("parentTask", org.hamcrest.Matchers.hasProperty("id", org.hamcrest.Matchers.is(parentId))))
+                .andExpect(model().attribute("parentTask", org.hamcrest.Matchers.hasProperty("title", org.hamcrest.Matchers.is("Parent Task for Subtask"))))
+                .andExpect(model().attributeExists("subtask"))
+                .andExpect(model().attributeExists("priorities"))
+                .andExpect(xpath("//p[contains(normalize-space(.), 'Adding subtask to: Parent Task for Subtask')]").exists());
+    }
+
+    @Test
+    void testGetAddSubTaskForm_shouldRedirect_whenParentNotFound() throws Exception {
+        mockMvc.perform(get("/task/999/addSubTask")) // Assuming 999 does not exist
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    void testPostAddSubTask_shouldCreateSubtaskAndRedirect_whenParentExists() throws Exception {
+        Todo parentTask = todoRepository.save(new Todo(0L, "Parent for Subtask", false, null, Priority.MEDIUM));
+        Long parentId = parentTask.getId();
+
+        LocalDate dueDate = LocalDate.now().plusDays(1);
+        String formattedDueDate = dueDate.format(DateTimeFormatter.ISO_DATE);
+        Priority priority = Priority.HIGH;
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("title", "My New Subtask");
+        params.add("dueDate", formattedDueDate);
+        params.add("priority", priority.name());
+
+        mockMvc.perform(post("/task/" + parentId + "/addSubTask")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .params(params))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/")); // Current redirect
+
+        List<Todo> allTodos = todoRepository.findAll();
+        assertEquals(2, allTodos.size()); // Parent and subtask
+
+        Todo savedSubtask = allTodos.stream().filter(t -> "My New Subtask".equals(t.getTitle())).findFirst().orElse(null);
+        assertNotNull(savedSubtask);
+        assertEquals(dueDate, savedSubtask.getDueDate());
+        assertEquals(priority, savedSubtask.getPriority());
+        assertNotNull(savedSubtask.getParent());
+        assertEquals(parentId, savedSubtask.getParent().getId());
+
+        // Verify parent's subtask list (requires fetching parent again or eager loading)
+        // For this test, verifying subtask's parent link is usually sufficient for basic check.
+        // More thorough check would involve fetching parent and asserting on its subTasks collection.
+    }
+
+    @Test
+    void testPostAddSubTask_shouldDoNothing_whenParentNotFound() throws Exception {
+        // Attempt to add subtask to a non-existent parent
+        mockMvc.perform(post("/task/999/addSubTask")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "Subtask for NonExistent Parent")
+                        .param("dueDate", LocalDate.now().toString())
+                        .param("priority", "MEDIUM"))
+                .andExpect(status().is3xxRedirection()) // Controller redirects to / if parent not found (or service returns empty)
+                .andExpect(redirectedUrl("/"));
+
+        assertEquals(0, todoRepository.count()); // No tasks should have been created
+    }
+
+
+    @Test
+    void testGetIndex_shouldDisplayTasksWithNestedSubtasks() throws Exception {
+        Todo parent = new Todo(0L, "Parent Task", false, null, Priority.MEDIUM);
+        parent = todoRepository.save(parent);
+
+        Todo subtask1 = new Todo(0L, "Subtask 1", false, null, Priority.HIGH);
+        subtask1.setParent(parent);
+        todoRepository.save(subtask1);
+
+        Todo subtask2 = new Todo(0L, "Subtask 2", true, LocalDate.now().plusDays(1), Priority.LOW);
+        subtask2.setParent(parent);
+        todoRepository.save(subtask2);
+
+        // Refresh parent to ensure subtasks are loaded if accessed (though not strictly needed for this XPath test)
+        // parent = todoRepository.findById(parent.getId()).get();
+
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul[contains(@class, 'subtask-list')]").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul/li[contains(.,'Subtask 1')]").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul/li[contains(.,'Subtask 1')]//span[contains(@class, 'badge-danger') and text()='High']").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul/li[contains(.,'Subtask 2')]").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul/li[contains(.,'Subtask 2')]//span[@class='completed']").exists())
+                .andExpect(xpath("//li[contains(.,'Parent Task')]//ul/li[contains(.,'Subtask 2')]//span[contains(@class, 'badge-info') and text()='Low']").exists());
+    }
+
+    @Test
+    void testDeleteParentTask_shouldCascadeDeleteSubtasks() throws Exception {
+        Todo parent = new Todo(0L, "Parent With Subtasks", false, null, Priority.MEDIUM);
+        parent = todoRepository.save(parent);
+        Long parentId = parent.getId();
+
+        Todo subtask1 = new Todo(0L, "Subtask To Delete 1", false, null, Priority.HIGH);
+        subtask1.setParent(parent);
+        todoRepository.save(subtask1);
+        Long subtask1Id = subtask1.getId();
+
+        Todo subtask2 = new Todo(0L, "Subtask To Delete 2", false, null, Priority.LOW);
+        subtask2.setParent(parent);
+        todoRepository.save(subtask2);
+        Long subtask2Id = subtask2.getId();
+
+        assertEquals(3, todoRepository.count());
+
+        mockMvc.perform(post("/delete")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("id", String.valueOf(parentId)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+
+        assertEquals(0, todoRepository.count()); // Parent and both subtasks should be gone
+        assertFalse(todoRepository.findById(parentId).isPresent());
+        assertFalse(todoRepository.findById(subtask1Id).isPresent());
+        assertFalse(todoRepository.findById(subtask2Id).isPresent());
+    }
+
+    @Test
+    void testGetEditId_shouldDisplayParentAndSubtaskInfo() throws Exception {
+        // Parent Task
+        Todo parentTask = new Todo(0L, "Main Project Task", false, LocalDate.now().plusDays(10), Priority.HIGH);
+        parentTask = todoRepository.save(parentTask);
+
+        // Subtask
+        Todo subTask = new Todo(0L, "Sub-feature A", false, LocalDate.now().plusDays(5), Priority.MEDIUM);
+        subTask.setParent(parentTask);
+        todoRepository.save(subTask);
+        // Refresh parent to have subTasks collection populated for the assertion if not using JOIN FETCH
+        // parentTask.addSubTask(subTask); // Handled by subTask.setParent() and JPA if bidirectional utility is used
+        // todoRepository.save(parentTask); // Not strictly necessary if cascade is set up from subtask to parent (which it isn't, parent is owning side)
+                                        // or if we re-fetch parent below.
+
+        // Test editing the parent task
+        mockMvc.perform(get("/edit/" + parentTask.getId()))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//h5[text()='Subtasks:']").exists())
+            .andExpect(xpath("//ul/li[contains(.,'Sub-feature A')]").exists());
+
+        // Test editing the subtask
+        mockMvc.perform(get("/edit/" + subTask.getId()))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//p[contains(.,'This is a subtask of:')]//strong[text()='Main Project Task']").exists())
+            .andExpect(xpath("//p//a[contains(text(),'(Edit Parent)') and @href='/edit/" + parentTask.getId() + "']").exists());
+    }
 }

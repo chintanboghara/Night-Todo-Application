@@ -67,4 +67,29 @@ public class TodoController {
     }
     return "redirect:/";
   }
+
+  @GetMapping("/task/{parentId}/addSubTask")
+  public String showAddSubTaskForm(@PathVariable Long parentId, Model model) {
+    Optional<Todo> parentTodo = todoService.findTodoById(parentId);
+    if (parentTodo.isPresent()) {
+      model.addAttribute("parentTask", parentTodo.get());
+      model.addAttribute("subtask", new Todo()); // For form binding
+      model.addAttribute("priorities", Priority.values());
+      return "add-subtask"; // Name of the new template for adding subtasks
+    } else {
+      // Parent task not found, redirect or show an error
+      return "redirect:/";
+    }
+  }
+
+  @PostMapping("/task/{parentId}/addSubTask")
+  public String addSubTask(@PathVariable Long parentId,
+                           @RequestParam String title,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                           @RequestParam(required = false) Priority priority) {
+    if (title != null && !title.trim().isEmpty()) {
+      todoService.addSubTask(parentId, title, dueDate, priority);
+    }
+    return "redirect:/"; // Consider redirecting to parent task anchor: "/#task-" + parentId
+  }
 }

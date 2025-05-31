@@ -30,6 +30,20 @@
     <button type="submit" class="btn btn-primary">Update Task</button>
     <a href="/" class="btn btn-secondary">Cancel</a>
   </form>
+
+  <div th:if="${todo.parent != null}" class="mt-4">
+      <p>This is a subtask of: <strong th:text="${todo.parent.title}"></strong> <a th:href="@{/edit/{id}(id=${todo.parent.id})}">(Edit Parent)</a></p>
+  </div>
+
+  <div th:if="${todo.subTasks != null && !todo.subTasks.isEmpty()}" class="mt-4">
+      <h5>Subtasks:</h5>
+      <ul class="list-group">
+          <li th:each="sub : ${todo.subTasks}" class="list-group-item d-flex justify-content-between align-items-center">
+              <span th:text="${sub.title}"></span>
+              <a th:href="@{/edit/{id}(id=${sub.id})}" class="btn btn-sm btn-outline-info">View/Edit Subtask</a>
+          </li>
+      </ul>
+  </div>
 </div>
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>

@@ -1,17 +1,20 @@
 package com.example.todo.model;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
-// Import Priority Enum (already in the same package, so not strictly necessary for compilation,
-// but good for clarity and if it were in a different package)
-// import com.example.todo.model.Priority;
+import java.util.List;
+import java.util.ArrayList;
+// Priority Enum is in the same package
 
 @Entity
 public class Todo {
@@ -27,8 +30,16 @@ public class Todo {
   @Enumerated(EnumType.STRING)
   private Priority priority;
 
+  @ManyToOne
+  @JoinColumn(name = "parent_id")
+  private Todo parent;
+
+  @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<Todo> subTasks = new ArrayList<>();
+
   public Todo() {
     this.priority = Priority.MEDIUM; // Default priority
+    // subTasks is initialized at field declaration
   }
 
   public Todo(long id, String title, boolean completed, LocalDate dueDate, Priority priority) {
@@ -77,6 +88,33 @@ public class Todo {
 
   public void setPriority(Priority priority) {
     this.priority = priority;
+  }
+
+  public Todo getParent() {
+    return parent;
+  }
+
+  public void setParent(Todo parent) {
+    this.parent = parent;
+  }
+
+  public List<Todo> getSubTasks() {
+    return subTasks;
+  }
+
+  public void setSubTasks(List<Todo> subTasks) {
+    this.subTasks = subTasks;
+  }
+
+  // Utility methods for managing subtasks
+  public void addSubTask(Todo subTask) {
+    this.subTasks.add(subTask);
+    subTask.setParent(this);
+  }
+
+  public void removeSubTask(Todo subTask) {
+    this.subTasks.remove(subTask);
+    subTask.setParent(null);
   }
 
   public boolean isOverdue() {
