@@ -9,16 +9,20 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
 ## Features
 
 - **Add Tasks:** Quickly add new todo items.
+- **Edit Tasks:** Modify the title of existing tasks.
 - **Complete Tasks:** Mark tasks as completed with a single click.
 - **Delete Tasks:** Remove tasks that are no longer needed.
+- **Persistent Task Storage:** Tasks are saved in an H2 in-memory database.
 - **Dark Themed UI:** Enjoy a visually appealing interface with a sleek black background.
 
 ## Technology Stack
 
 - **Java 17**
 - **Spring Boot 3.1.2**
+- **Spring Data JPA**
 - **Maven**
 - **Thymeleaf**
+- **H2 Database**
 - **Docker**
 
 ## Prerequisites
@@ -139,10 +143,41 @@ Build and run the Night Todo Application using Cloud Native Buildpacks.
   - This command maps port **8081** of the container to port **8081** on your host machine.
   - The application will be accessible at [http://localhost:8081](http://localhost:8081).
 
-## Configuration
+## Application Configuration
 
-The application's configuration is managed in `src/main/resources/application.properties`. By default, the server is configured to run on port **8081**:
+The application's configuration is managed in `src/main/resources/application.properties`.
+
+### Server Port
+
+By default, the server is configured to run on port **8081**:
 
 ```properties
 server.port=8081
 ```
+
+### Database (H2)
+
+The application uses an H2 in-memory database by default.
+- **H2 Console:** The H2 console is enabled for development and can be accessed at `http://localhost:8081/h2-console`.
+- **JDBC URL:** `jdbc:h2:mem:testdb`
+- **Username:** `sa`
+- **Password:** `password`
+
+These settings can be found and modified in `application.properties`:
+```properties
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+```
+
+**Persistent Storage (Optional):**
+To persist data across application restarts (when running locally, not typically for containerized deployments without further Docker configuration), you can change the `spring.datasource.url` to use a file-based H2 database. For example:
+```properties
+# spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.url=jdbc:h2:file:./data/tododb
+```
+This will create a database file in a `data` directory in your project's root.
