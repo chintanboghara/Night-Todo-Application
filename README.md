@@ -15,8 +15,14 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
 - **Due Dates:** Assign due dates to tasks to keep track of deadlines.
 - **Visual Reminders for Due Dates:** Overdue tasks are visually highlighted in the task list.
 - **Task Prioritization:** Assign priority levels (High, Medium, Low) to tasks.
-- **Priority Display:** Task priorities are clearly displayed, often with color-coding (e.g., High - Red, Medium - Yellow, Low - Blue).
-- **Persistent Task Storage:** Tasks are saved in an H2 in-memory database, with console access enabled for development.
+- **Priority Display:** Task priorities are clearly displayed with color-coded badges.
+- **Hierarchical Tasks (Subtasks):**
+    - Break down complex tasks into smaller, manageable subtasks.
+    - Add subtasks directly to any existing task.
+    - Subtasks are displayed hierarchically indented under their parent task.
+    - Subtasks can be managed (completed, edited, deleted) independently.
+    - Deleting a parent task automatically deletes all its associated subtasks (cascade deletion).
+- **Persistent Task Storage:** Tasks (including parent-child relationships) are saved in an H2 in-memory database, with console access enabled for development.
 - **Dark Themed UI:** Enjoy a visually appealing interface with a sleek black background.
 
 ## Technology Stack

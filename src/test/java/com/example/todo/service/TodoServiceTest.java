@@ -45,14 +45,14 @@ public class TodoServiceTest {
     }
 
     @Test
-    void getTodos_shouldReturnListOfTodos() {
-        when(todoRepository.findAll()).thenReturn(Arrays.asList(todo1, todo2));
+    void getTodos_shouldReturnListOfTopLevelTasks() { // Renamed for clarity
+        when(todoRepository.findByParentIsNull()).thenReturn(Arrays.asList(todo1, todo2));
 
         List<Todo> todos = todoService.getTodos();
 
         assertEquals(2, todos.size());
         assertEquals("Test Task 1", todos.get(0).getTitle());
-        verify(todoRepository, times(1)).findAll();
+        verify(todoRepository, times(1)).findByParentIsNull();
     }
 
     @Test
@@ -212,5 +212,78 @@ public class TodoServiceTest {
 
         assertFalse(foundTodo.isPresent());
         verify(todoRepository, times(1)).findById(3L);
+    }
+
+    // Tests for addSubTask
+    @Test
+    void addSubTask_shouldCreateAndReturnSubtask_whenParentExists() {
+        Long parentId = 1L;
+        String title = "Subtask Title";
+        LocalDate dueDate = LocalDate.now().plusDays(2);
+        Priority priority = Priority.HIGH;
+
+        Todo parentTodo = new Todo();
+        parentTodo.setId(parentId);
+        parentTodo.setTitle("Parent Task");
+
+        when(todoRepository.findById(parentId)).thenReturn(Optional.of(parentTodo));
+
+        Todo subtaskToSave = new Todo(); // Will have default MEDIUM priority
+        subtaskToSave.setTitle(title);
+        subtaskToSave.setDueDate(dueDate);
+        subtaskToSave.setPriority(priority); // Explicitly set for this test
+        subtaskToSave.setParent(parentTodo);
+        // parentTodo.getSubTasks().add(subtaskToSave); // Simulating bidirectional link if addSubTask utility was used
+
+        when(todoRepository.save(any(Todo.class))).thenReturn(subtaskToSave);
+
+        Optional<Todo> savedSubtaskOptional = todoService.addSubTask(parentId, title, dueDate, priority);
+
+        assertTrue(savedSubtaskOptional.isPresent());
+        Todo savedSubtask = savedSubtaskOptional.get();
+        assertEquals(title, savedSubtask.getTitle());
+        assertEquals(dueDate, savedSubtask.getDueDate());
+        assertEquals(priority, savedSubtask.getPriority());
+        assertNotNull(savedSubtask.getParent());
+        assertEquals(parentId, savedSubtask.getParent().getId());
+
+        verify(todoRepository, times(1)).findById(parentId);
+        verify(todoRepository, times(1)).save(any(Todo.class));
+    }
+
+    @Test
+    void addSubTask_shouldReturnEmpty_whenParentNotFound() {
+        Long parentId = 99L; // Non-existent parent
+        when(todoRepository.findById(parentId)).thenReturn(Optional.empty());
+
+        Optional<Todo> result = todoService.addSubTask(parentId, "Subtask Title", null, Priority.MEDIUM);
+
+        assertFalse(result.isPresent());
+        verify(todoRepository, times(1)).findById(parentId);
+        verify(todoRepository, never()).save(any(Todo.class));
+    }
+
+    @Test
+    void addSubTask_whenNullPriority_shouldDefaultToMedium() {
+        Long parentId = 1L;
+        String title = "Subtask Default Priority";
+        LocalDate dueDate = LocalDate.now().plusDays(2);
+        Todo parentTodo = new Todo();
+        parentTodo.setId(parentId);
+
+        when(todoRepository.findById(parentId)).thenReturn(Optional.of(parentTodo));
+
+        // Capture the argument passed to save to check its priority
+        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> {
+            Todo saved = invocation.getArgument(0);
+            assertEquals(Priority.MEDIUM, saved.getPriority());
+            return saved;
+        });
+
+        Optional<Todo> savedSubtaskOptional = todoService.addSubTask(parentId, title, dueDate, null);
+
+        assertTrue(savedSubtaskOptional.isPresent());
+        assertEquals(Priority.MEDIUM, savedSubtaskOptional.get().getPriority());
+        verify(todoRepository, times(1)).save(any(Todo.class));
     }
 }
