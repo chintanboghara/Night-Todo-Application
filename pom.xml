@@ -56,6 +56,12 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Spring Security Test for testing security features -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Thymeleaf Extras for Java 8 Time API -->
     <dependency>
       <groupId>org.thymeleaf.extras</groupId>
