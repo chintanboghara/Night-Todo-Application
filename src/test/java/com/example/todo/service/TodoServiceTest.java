@@ -64,61 +64,82 @@ public class TodoServiceTest {
     // --- Tests for getTodos ---
 
     @Test
-    void getTodos_defaultParameters_shouldSortByCreationDateAsc() {
-        todoService.getTodos(null, null, null, null, null, null); // All null or default
+    void getTodos_defaultParameters_shouldSortByDisplayOrderAsc() {
+        todoService.getTodos(null, null, null, null, null, null); // All null for sortBy and sortDir
 
         Sort capturedSort = sortCaptor.getValue();
-        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("creationDate").getDirection());
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection());
         assertNotNull(specCaptor.getValue());
         verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
 
     @Test
-    void getTodos_explicitDefaultParameters_shouldSortByCreationDateAsc() {
-        todoService.getTodos("ALL", null, "ALL", "", "creationDate", "ASC");
-
+    void getTodos_sortByNullOrEmptyOrManual_shouldSortByDisplayOrder() {
+        todoService.getTodos(null, null, null, null, null, "DESC"); // sortBy null, sortDir DESC
         Sort capturedSort = sortCaptor.getValue();
-        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("creationDate").getDirection());
-        assertNotNull(specCaptor.getValue());
-        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("displayOrder").getDirection());
+
+        todoService.getTodos(null, null, null, null, "", "ASC"); // sortBy empty, sortDir ASC
+        capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection());
+
+        todoService.getTodos(null, null, null, null, "manual", "DESC"); // sortBy "manual"
+        capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("displayOrder").getDirection());
+
+        todoService.getTodos(null, null, null, null, "displayOrder", "ASC"); // sortBy "displayOrder"
+        capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection());
     }
 
     @Test
-    void getTodos_sortByTitleDesc_shouldApplyCorrectSort() {
+    void getTodos_sortByTitleDesc_shouldApplyCorrectSortWithSecondaryDisplayOrder() {
         todoService.getTodos(null, null, null, null, "title", "DESC");
 
         Sort capturedSort = sortCaptor.getValue();
         assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("title").getDirection());
-        assertNull(capturedSort.getOrderFor("creationDate"));
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection()); // Secondary sort
         verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
 
     @Test
-    void getTodos_sortByDueDateAsc_shouldApplyCorrectSort() {
+    void getTodos_sortByDueDateAsc_shouldApplyCorrectSortWithSecondaryDisplayOrder() {
         todoService.getTodos(null, null, null, null, "dueDate", "ASC");
 
         Sort capturedSort = sortCaptor.getValue();
         assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("dueDate").getDirection());
-        assertNull(capturedSort.getOrderFor("creationDate"));
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection()); // Secondary sort
         verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
 
     @Test
-    void getTodos_sortByPriorityDesc_shouldApplyCorrectSort() {
+    void getTodos_sortByCreationDateAsc_shouldApplyCorrectSortWithSecondaryDisplayOrder() {
+        todoService.getTodos(null, null, null, null, "creationDate", "ASC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("creationDate").getDirection());
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection()); // Secondary sort
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+
+    @Test
+    void getTodos_sortByPriorityDesc_shouldApplyCorrectSortWithSecondaryDisplayOrder() {
         todoService.getTodos(null, null, null, null, "priority", "DESC");
 
         Sort capturedSort = sortCaptor.getValue();
         assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("priority").getDirection());
-        assertNull(capturedSort.getOrderFor("creationDate"));
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection()); // Secondary sort
         verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
 
     @Test
-    void getTodos_invalidSortBy_shouldDefaultToCreationDateWithProvidedDirection() {
+    void getTodos_invalidSortBy_shouldDefaultToDisplayOrderWithProvidedDirection() {
         todoService.getTodos(null, null, null, null, "invalidField", "DESC");
 
         Sort capturedSort = sortCaptor.getValue();
-        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("creationDate").getDirection());
+        // Default field is "displayOrder" if primary sort field is invalid
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("displayOrder").getDirection());
         assertNull(capturedSort.getOrderFor("invalidField"));
         verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
@@ -198,33 +219,170 @@ public class TodoServiceTest {
 
     @Test
     void getTodos_withCombinedFiltersAndSort_callsRepositoryWithCorrectSort() {
-        // Reset captors for this specific call to ensure clean capture
-        specCaptor = ArgumentCaptor.forClass(Specification.class);
-        sortCaptor = ArgumentCaptor.forClass(Sort.class);
-        when(todoRepository.findAll(specCaptor.capture(), sortCaptor.capture())).thenReturn(new ArrayList<>());
+        // Reset captors for this specific call to ensure clean capture for this test's specific when()
+        ArgumentCaptor<Specification<Todo>> localSpecCaptor = ArgumentCaptor.forClass(Specification.class);
+        ArgumentCaptor<Sort> localSortCaptor = ArgumentCaptor.forClass(Sort.class);
+        when(todoRepository.findAll(localSpecCaptor.capture(), localSortCaptor.capture())).thenReturn(new ArrayList<>());
 
         todoService.getTodos("PENDING", Priority.MEDIUM, "TODAY", "search", "priority", "DESC");
 
-        Sort capturedSort = sortCaptor.getValue();
+        Sort capturedSort = localSortCaptor.getValue(); // Use local captor
         assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("priority").getDirection());
-        assertNotNull(specCaptor.getValue());
-        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("displayOrder").getDirection()); // Secondary sort
+        assertNotNull(localSpecCaptor.getValue());
+        verify(todoRepository, times(1)).findAll(any(Specification.class), any(Sort.class));
     }
 
     // --- End of tests for getTodos ---
+
+    // --- Tests for displayOrder in addTodo and addSubTask ---
+    @Test
+    void addTodo_shouldSetCorrectDisplayOrder_forNewTopLevelTask() {
+        ArgumentCaptor<Todo> todoCaptor = ArgumentCaptor.forClass(Todo.class);
+        when(todoRepository.save(todoCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        // First task
+        when(todoRepository.findMaxDisplayOrderByParentIsNull()).thenReturn(null);
+        todoService.addTodo("First Task", null, null);
+        assertEquals(0, todoCaptor.getValue().getDisplayOrder());
+
+        // Subsequent task
+        when(todoRepository.findMaxDisplayOrderByParentIsNull()).thenReturn(1);
+        todoService.addTodo("Third Task", null, null);
+        assertEquals(2, todoCaptor.getValue().getDisplayOrder());
+    }
+
+    @Test
+    void addSubTask_shouldSetCorrectDisplayOrder_forNewSubTask() {
+        Long parentId = 1L;
+        Todo parentTodo = new Todo();
+        parentTodo.setId(parentId);
+        when(todoRepository.findById(parentId)).thenReturn(Optional.of(parentTodo));
+
+        ArgumentCaptor<Todo> todoCaptor = ArgumentCaptor.forClass(Todo.class);
+        when(todoRepository.save(todoCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        // First subtask for this parent
+        when(todoRepository.findMaxDisplayOrderByParent(parentTodo)).thenReturn(null);
+        todoService.addSubTask(parentId, "First Subtask", null, null);
+        assertEquals(0, todoCaptor.getValue().getDisplayOrder());
+        assertEquals(parentTodo, todoCaptor.getValue().getParent());
+
+        // Subsequent subtask for this parent
+        when(todoRepository.findMaxDisplayOrderByParent(parentTodo)).thenReturn(0);
+        todoService.addSubTask(parentId, "Second Subtask", null, null);
+        assertEquals(1, todoCaptor.getValue().getDisplayOrder());
+        assertEquals(parentTodo, todoCaptor.getValue().getParent());
+    }
+
+    // --- Tests for updateTaskOrder ---
+    @Test
+    void updateTaskOrder_shouldReorderTopLevelTasks() {
+        Todo t1 = new Todo(); t1.setId(1L); t1.setDisplayOrder(0); t1.setParent(null);
+        Todo t2 = new Todo(); t2.setId(2L); t2.setDisplayOrder(1); t2.setParent(null);
+        Todo t3 = new Todo(); t3.setId(3L); t3.setDisplayOrder(2); t3.setParent(null);
+
+        when(todoRepository.findById(1L)).thenReturn(Optional.of(t1));
+        when(todoRepository.findById(2L)).thenReturn(Optional.of(t2));
+        when(todoRepository.findById(3L)).thenReturn(Optional.of(t3));
+
+        ArgumentCaptor<List<Todo>> saveAllCaptor = ArgumentCaptor.forClass(List.class);
+
+        todoService.updateTaskOrder(Arrays.asList(3L, 1L, 2L), null);
+
+        verify(todoRepository).saveAll(saveAllCaptor.capture());
+        List<Todo> savedTasks = saveAllCaptor.getValue();
+
+        assertEquals(3, savedTasks.size());
+        assertEquals(0, savedTasks.stream().filter(t -> t.getId() == 3L).findFirst().get().getDisplayOrder());
+        assertEquals(1, savedTasks.stream().filter(t -> t.getId() == 1L).findFirst().get().getDisplayOrder());
+        assertEquals(2, savedTasks.stream().filter(t -> t.getId() == 2L).findFirst().get().getDisplayOrder());
+    }
+
+    @Test
+    void updateTaskOrder_shouldReorderSubtasks_forSpecificParent() {
+        Todo parent = new Todo(); parent.setId(10L);
+        Todo s1 = new Todo(); s1.setId(1L); s1.setDisplayOrder(0); s1.setParent(parent);
+        Todo s2 = new Todo(); s2.setId(2L); s2.setDisplayOrder(1); s2.setParent(parent);
+        Todo s3 = new Todo(); s3.setId(3L); s3.setDisplayOrder(2); s3.setParent(parent);
+
+        when(todoRepository.findById(1L)).thenReturn(Optional.of(s1));
+        when(todoRepository.findById(2L)).thenReturn(Optional.of(s2));
+        when(todoRepository.findById(3L)).thenReturn(Optional.of(s3));
+
+        ArgumentCaptor<List<Todo>> saveAllCaptor = ArgumentCaptor.forClass(List.class);
+
+        todoService.updateTaskOrder(Arrays.asList(3L, 1L, 2L), 10L);
+
+        verify(todoRepository).saveAll(saveAllCaptor.capture());
+        List<Todo> savedTasks = saveAllCaptor.getValue();
+
+        assertEquals(3, savedTasks.size());
+        assertEquals(0, savedTasks.stream().filter(t -> t.getId() == 3L).findFirst().get().getDisplayOrder());
+        assertEquals(1, savedTasks.stream().filter(t -> t.getId() == 1L).findFirst().get().getDisplayOrder());
+        assertEquals(2, savedTasks.stream().filter(t -> t.getId() == 2L).findFirst().get().getDisplayOrder());
+    }
+
+    @Test
+    void updateTaskOrder_shouldOnlyUpdateTasksMatchingParentContext_andSkipUnchangedOrders() {
+        Todo t1 = new Todo(); t1.setId(1L); t1.setDisplayOrder(0); t1.setParent(null); // Matches parentId = null
+        Todo p1 = new Todo(); p1.setId(10L);
+        Todo s1 = new Todo(); s1.setId(2L); s1.setDisplayOrder(1); s1.setParent(p1); // Does not match parentId = null
+        Todo t2 = new Todo(); t2.setId(3L); t2.setDisplayOrder(1); t2.setParent(null); // Matches, but order is already correct for its new position if it were [t1,t2]
+
+        when(todoRepository.findById(1L)).thenReturn(Optional.of(t1));
+        when(todoRepository.findById(2L)).thenReturn(Optional.of(s1)); // s1 will be skipped due to parent mismatch
+        when(todoRepository.findById(3L)).thenReturn(Optional.of(t2));
+
+
+        ArgumentCaptor<List<Todo>> saveAllCaptor = ArgumentCaptor.forClass(List.class);
+
+        // Attempt to reorder [t1, s1, t2] as top-level. s1 should be ignored.
+        // If t1 is now at index 0 (new order 0), and its old order was 0, it's skipped by saveAll.
+        // If t2 is now at index 1 (new order 1, after s1 is filtered out conceptually), and its old order was 1, it's also skipped.
+        // Let's make one of them change order: reorder [t2, t1] as top-level
+        // t2 (id 3) new order 0, old order 1 -> should be updated
+        // t1 (id 1) new order 1, old order 0 -> should be updated
+        todoService.updateTaskOrder(Arrays.asList(3L, 1L), null);
+
+        verify(todoRepository).saveAll(saveAllCaptor.capture());
+        List<Todo> savedTasks = saveAllCaptor.getValue();
+
+        assertEquals(2, savedTasks.size()); // Only t1 and t2 should be considered for update
+        assertTrue(savedTasks.stream().anyMatch(t -> t.getId() == 1L && t.getDisplayOrder() == 1));
+        assertTrue(savedTasks.stream().anyMatch(t -> t.getId() == 3L && t.getDisplayOrder() == 0));
+
+        // Test case where order doesn't change for any matched task
+        reset(todoRepository); // Reset mocks for new verification
+        t1.setDisplayOrder(0); // Reset to original for this part of test
+        t2.setDisplayOrder(1);
+        when(todoRepository.findById(1L)).thenReturn(Optional.of(t1));
+        when(todoRepository.findById(3L)).thenReturn(Optional.of(t2));
+
+        todoService.updateTaskOrder(Arrays.asList(1L, 3L), null); // Orders match existing orders
+        verify(todoRepository, never()).saveAll(any()); // saveAll should not be called
+    }
+
 
     @Test
     void addTodo_shouldSaveAndReturnTodoWithPriority() {
         LocalDate dueDate = LocalDate.now().plusDays(5);
         Priority priority = Priority.HIGH;
 
-        Todo todoToSave = new Todo(); // This will have default priority MEDIUM
+        // Mock findMaxDisplayOrderByParentIsNull for this specific test, as it's called by addTodo
+        when(todoRepository.findMaxDisplayOrderByParentIsNull()).thenReturn(null);
+
+        Todo todoToSave = new Todo();
         todoToSave.setTitle("New Task");
         todoToSave.setCompleted(false);
         todoToSave.setDueDate(dueDate);
-        todoToSave.setPriority(priority); // Explicitly set for this test case
+        todoToSave.setPriority(priority);
+        todoToSave.setDisplayOrder(0); // What we expect it to be set to
 
-        when(todoRepository.save(any(Todo.class))).thenReturn(todoToSave);
+        // Capture the argument to save, then return it, checking displayOrder
+        ArgumentCaptor<Todo> todoCaptor = ArgumentCaptor.forClass(Todo.class);
+        when(todoRepository.save(todoCaptor.capture())).thenReturn(todoToSave);
+
 
         Todo savedTodo = todoService.addTodo("New Task", dueDate, priority);
 
@@ -233,7 +391,10 @@ public class TodoServiceTest {
         assertFalse(savedTodo.isCompleted());
         assertEquals(dueDate, savedTodo.getDueDate());
         assertEquals(priority, savedTodo.getPriority());
+        assertEquals(0, savedTodo.getDisplayOrder()); // Verify displayOrder
         verify(todoRepository, times(1)).save(any(Todo.class));
+        verify(todoRepository, times(1)).findMaxDisplayOrderByParentIsNull();
+
     }
 
     @Test

@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.OrderBy; // Added this import
 import jakarta.persistence.PrePersist;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
@@ -37,9 +38,11 @@ public class Todo {
   private Todo parent;
 
   @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("displayOrder ASC") // Added this annotation
   private List<Todo> subTasks = new ArrayList<>();
 
   private LocalDateTime creationDate;
+  private Integer displayOrder;
 
   @PrePersist
   protected void onCreate() {
@@ -123,6 +126,14 @@ public class Todo {
 
   public void setCreationDate(LocalDateTime creationDate) {
     this.creationDate = creationDate;
+  }
+
+  public Integer getDisplayOrder() {
+    return displayOrder;
+  }
+
+  public void setDisplayOrder(Integer displayOrder) {
+    this.displayOrder = displayOrder;
   }
 
   // Utility methods for managing subtasks
