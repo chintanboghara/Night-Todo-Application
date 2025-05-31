@@ -3,6 +3,7 @@ package com.example.todo.controller;
 import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.repository.TodoRepository;
+import com.example.todo.repository.TodoRepository;
 import com.fasterxml.jackson.databind.ObjectMapper; // Added for JSON serialization
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders; // Added
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -20,8 +22,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays; // Added this import
 import java.util.List;
 import java.util.Optional;
+import org.springframework.web.context.WebApplicationContext; // Added
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity; // Added
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,11 +33,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc // Keeping this for now, may be removed if fully manual setup is preferred
 public class TodoControllerIntegrationTest {
 
+    private MockMvc mockMvc; // Removed @Autowired
+
     @Autowired
-    private MockMvc mockMvc;
+    private WebApplicationContext context; // Added
 
     @Autowired
     private TodoRepository todoRepository;
@@ -48,7 +54,13 @@ public class TodoControllerIntegrationTest {
         // Clean up before each test to ensure isolation
         todoRepository.deleteAll();
 
+        mockMvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+
         // Setup initial data if needed by multiple tests, otherwise create in test methods
+        // task1 is currently unused, consider removing if not needed for a specific test.
         task1 = new Todo();
         task1.setTitle("Initial Task for Tests");
         task1.setCompleted(false);
