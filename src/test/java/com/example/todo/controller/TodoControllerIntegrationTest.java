@@ -17,6 +17,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays; // Added this import
 import java.util.List;
 import java.util.Optional;
 
@@ -315,7 +316,7 @@ public class TodoControllerIntegrationTest {
         // Task 6
         createAndSaveTodo("Task Echo (No Due Date, High, Pending)", false, null, Priority.HIGH, null);
         // Task 7 (New specific date task for testing, Newest creation date)
-        createAndSaveTodo("Task Golf (Specific Date, Medium, Pending)", false, LocalDate.now().plusYears(1).withMonth(3).withDay(15), Priority.MEDIUM, null);
+        createAndSaveTodo("Task Golf (Specific Date, Medium, Pending)", false, LocalDate.now().plusYears(1).withMonth(3).withDayOfMonth(15), Priority.MEDIUM, null);
 
         // Expected order for default sort (creationDate ASC): Charlie, Delta, Bravo, Alpha, Foxtrot, Echo, Golf
         // Expected order for creationDate DESC: Golf, Echo, Foxtrot, Alpha, Bravo, Delta, Charlie
@@ -468,7 +469,7 @@ public class TodoControllerIntegrationTest {
     @Test
     void testFilterByDueDate_SpecificDate() throws Exception {
         setupFilterSortTestData();
-        LocalDate specificTestDate = LocalDate.now().plusYears(1).withMonth(3).withDay(15);
+        LocalDate specificTestDate = LocalDate.now().plusYears(1).withMonth(3).withDayOfMonth(15);
         String specificDateStr = specificTestDate.format(DateTimeFormatter.ISO_DATE);
 
         mockMvc.perform(get("/").param("filterByDueDate", specificDateStr))
