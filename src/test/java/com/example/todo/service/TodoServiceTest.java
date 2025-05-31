@@ -1,5 +1,6 @@
 package com.example.todo.service;
 
+import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.repository.TodoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,22 +56,55 @@ public class TodoServiceTest {
     }
 
     @Test
-    void addTodo_shouldSaveAndReturnTodo() {
+    void addTodo_shouldSaveAndReturnTodoWithPriority() {
         LocalDate dueDate = LocalDate.now().plusDays(5);
-        Todo newTodo = new Todo();
-        newTodo.setTitle("New Task");
-        newTodo.setCompleted(false);
-        newTodo.setDueDate(dueDate);
+        Priority priority = Priority.HIGH;
 
-        // ArgumentCaptor can be used if we need to assert properties of the object passed to save
-        when(todoRepository.save(any(Todo.class))).thenReturn(newTodo);
+        Todo todoToSave = new Todo(); // This will have default priority MEDIUM
+        todoToSave.setTitle("New Task");
+        todoToSave.setCompleted(false);
+        todoToSave.setDueDate(dueDate);
+        todoToSave.setPriority(priority); // Explicitly set for this test case
 
-        Todo savedTodo = todoService.addTodo("New Task", dueDate);
+        when(todoRepository.save(any(Todo.class))).thenReturn(todoToSave);
+
+        Todo savedTodo = todoService.addTodo("New Task", dueDate, priority);
 
         assertNotNull(savedTodo);
         assertEquals("New Task", savedTodo.getTitle());
         assertFalse(savedTodo.isCompleted());
         assertEquals(dueDate, savedTodo.getDueDate());
+        assertEquals(priority, savedTodo.getPriority());
+        verify(todoRepository, times(1)).save(any(Todo.class));
+    }
+
+    @Test
+    void addTodo_whenNullPriority_shouldDefaultToMedium() {
+        LocalDate dueDate = LocalDate.now().plusDays(5);
+
+        // We expect the service to create a Todo which will use its default constructor
+        // to set Priority.MEDIUM, or the service itself ensures MEDIUM if null is passed.
+        // The current service logic for addTodo: if (priority != null) { todo.setPriority(priority); }
+        // else it remains what the default constructor set (which is MEDIUM).
+
+        Todo todoWithDefaultPriority = new Todo(); // Uses default constructor, priority is MEDIUM
+        todoWithDefaultPriority.setTitle("Default Priority Task");
+        todoWithDefaultPriority.setDueDate(dueDate);
+        // No need to set priority here, it's MEDIUM by default from constructor
+
+        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> {
+            Todo saved = invocation.getArgument(0);
+            // Simulate what repository save would do if it returned the actual saved entity
+            // For this test, we're interested in the state of 'saved' as prepared by the service
+            assertEquals(Priority.MEDIUM, saved.getPriority());
+            return saved;
+        });
+
+        Todo savedTodo = todoService.addTodo("Default Priority Task", dueDate, null);
+
+        assertNotNull(savedTodo);
+        assertEquals("Default Priority Task", savedTodo.getTitle());
+        assertEquals(Priority.MEDIUM, savedTodo.getPriority()); // Verify it defaulted to MEDIUM
         verify(todoRepository, times(1)).save(any(Todo.class));
     }
 
@@ -104,19 +138,43 @@ public class TodoServiceTest {
     }
 
     @Test
-    void updateTodo_shouldUpdateTodoTitleAndDueDate() {
+    void updateTodo_shouldUpdateTodoTitleDueDateAndPriority() {
         LocalDate newDueDate = LocalDate.now().plusDays(10);
+        Priority newPriority = Priority.LOW;
+
+        todo1.setPriority(Priority.HIGH); // Set an initial priority different from newPriority
+
         when(todoRepository.findById(1L)).thenReturn(Optional.of(todo1));
-        // Ensure the save method is mocked to return the passed todo, which will have the updated fields
         when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-
-        Optional<Todo> updatedTodoOptional = todoService.updateTodo(1L, "Updated Title", newDueDate);
+        Optional<Todo> updatedTodoOptional = todoService.updateTodo(1L, "Updated Title", newDueDate, newPriority);
 
         assertTrue(updatedTodoOptional.isPresent());
         Todo updatedTodo = updatedTodoOptional.get();
         assertEquals("Updated Title", updatedTodo.getTitle());
         assertEquals(newDueDate, updatedTodo.getDueDate());
+        assertEquals(newPriority, updatedTodo.getPriority());
+
+        verify(todoRepository, times(1)).findById(1L);
+        verify(todoRepository, times(1)).save(any(Todo.class));
+    }
+
+    @Test
+    void updateTodo_whenNullPriority_shouldRetainExistingPriority() {
+        LocalDate newDueDate = LocalDate.now().plusDays(10);
+        Priority initialPriority = Priority.HIGH;
+        todo1.setPriority(initialPriority);
+
+        when(todoRepository.findById(1L)).thenReturn(Optional.of(todo1));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<Todo> updatedTodoOptional = todoService.updateTodo(1L, "Updated Title", newDueDate, null);
+
+        assertTrue(updatedTodoOptional.isPresent());
+        Todo updatedTodo = updatedTodoOptional.get();
+        assertEquals("Updated Title", updatedTodo.getTitle());
+        assertEquals(newDueDate, updatedTodo.getDueDate());
+        assertEquals(initialPriority, updatedTodo.getPriority()); // Priority should not change
 
         verify(todoRepository, times(1)).findById(1L);
         verify(todoRepository, times(1)).save(any(Todo.class));
@@ -125,9 +183,10 @@ public class TodoServiceTest {
     @Test
     void updateTodo_shouldDoNothingIfTodoNotFound() {
         LocalDate newDueDate = LocalDate.now().plusDays(10);
+        Priority newPriority = Priority.HIGH;
         when(todoRepository.findById(3L)).thenReturn(Optional.empty());
 
-        Optional<Todo> updatedTodoOptional = todoService.updateTodo(3L, "Non Existent", newDueDate);
+        Optional<Todo> updatedTodoOptional = todoService.updateTodo(3L, "Non Existent", newDueDate, newPriority);
 
         assertFalse(updatedTodoOptional.isPresent());
         verify(todoRepository, times(1)).findById(3L);

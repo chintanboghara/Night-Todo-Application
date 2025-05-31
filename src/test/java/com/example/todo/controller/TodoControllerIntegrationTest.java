@@ -1,5 +1,6 @@
 package com.example.todo.controller;
 
+import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.repository.TodoRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -56,7 +57,7 @@ public class TodoControllerIntegrationTest {
 
     @Test
     void testGetIndex_shouldShowTask() throws Exception {
-        Todo savedTask = todoRepository.save(new Todo(0L, "Test Get Index", false, null)); // Added null for dueDate
+        Todo savedTask = todoRepository.save(new Todo(0L, "Test Get Index", false, null, null)); // Added null for dueDate and priority
 
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
@@ -68,10 +69,12 @@ public class TodoControllerIntegrationTest {
     void testPostAdd_shouldCreateTaskAndRedirect() throws Exception {
         LocalDate dueDate = LocalDate.now().plusDays(3);
         String formattedDueDate = dueDate.format(DateTimeFormatter.ISO_DATE);
+        Priority priority = Priority.HIGH;
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("title", "New Task via POST");
         params.add("dueDate", formattedDueDate);
+        params.add("priority", priority.name());
 
         mockMvc.perform(post("/add")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -83,11 +86,34 @@ public class TodoControllerIntegrationTest {
         assertEquals(1, todos.size());
         assertEquals("New Task via POST", todos.get(0).getTitle());
         assertEquals(dueDate, todos.get(0).getDueDate());
+        assertEquals(priority, todos.get(0).getPriority());
+    }
+
+    @Test
+    void testPostAdd_withNoPriority_shouldDefaultToMedium() throws Exception {
+        LocalDate dueDate = LocalDate.now().plusDays(3);
+        String formattedDueDate = dueDate.format(DateTimeFormatter.ISO_DATE);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("title", "Task with Default Priority");
+        params.add("dueDate", formattedDueDate);
+        // No priority parameter sent
+
+        mockMvc.perform(post("/add")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .params(params))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+
+        List<Todo> todos = todoRepository.findAll();
+        assertEquals(1, todos.size());
+        assertEquals("Task with Default Priority", todos.get(0).getTitle());
+        assertEquals(Priority.MEDIUM, todos.get(0).getPriority()); // Assuming MEDIUM is default
     }
 
     @Test
     void testPostDelete_shouldRemoveTaskAndRedirect() throws Exception {
-        Todo taskToDelete = todoRepository.save(new Todo(0L, "Task to Delete", false, null)); // Added null for dueDate
+        Todo taskToDelete = todoRepository.save(new Todo(0L, "Task to Delete", false, null, null)); // Added null for dueDate and priority
         Long taskId = taskToDelete.getId();
 
         mockMvc.perform(post("/delete")
@@ -102,7 +128,7 @@ public class TodoControllerIntegrationTest {
 
     @Test
     void testPostComplete_shouldMarkTaskAsCompletedAndRedirect() throws Exception {
-        Todo taskToComplete = todoRepository.save(new Todo(0L, "Task to Complete", false, null)); // Added null for dueDate
+        Todo taskToComplete = todoRepository.save(new Todo(0L, "Task to Complete", false, null, null)); // Added null for dueDate and priority
         Long taskId = taskToComplete.getId();
 
         mockMvc.perform(post("/complete")
@@ -120,7 +146,8 @@ public class TodoControllerIntegrationTest {
     void testGetEditId_shouldShowEditFormWithTaskDetails() throws Exception {
         LocalDate dueDate = LocalDate.now().plusDays(5);
         String formattedDueDate = dueDate.format(DateTimeFormatter.ISO_DATE);
-        Todo taskToEdit = new Todo(0L, "Task to Edit", false, dueDate);
+        Priority priority = Priority.HIGH;
+        Todo taskToEdit = new Todo(0L, "Task to Edit", false, dueDate, priority);
         taskToEdit = todoRepository.save(taskToEdit);
         Long taskId = taskToEdit.getId();
 
@@ -129,7 +156,10 @@ public class TodoControllerIntegrationTest {
                 .andExpect(view().name("edit-todo"))
                 .andExpect(content().string(containsString("Task to Edit")))
                 .andExpect(xpath("//input[@name='title']/@value").string("Task to Edit"))
-                .andExpect(xpath("//input[@name='dueDate']/@value").string(formattedDueDate));
+                .andExpect(xpath("//input[@name='dueDate']/@value").string(formattedDueDate))
+                .andExpect(xpath("//select[@name='priority']/option[@value='HIGH' and @selected='selected']").exists())
+                .andExpect(xpath("//select[@name='priority']/option[@value='MEDIUM']").exists())
+                .andExpect(xpath("//select[@name='priority']/option[@value='LOW']").exists());
     }
 
     @Test
@@ -143,16 +173,19 @@ public class TodoControllerIntegrationTest {
     @Test
     void testPostUpdateId_shouldUpdateTaskAndRedirect() throws Exception {
         LocalDate initialDueDate = LocalDate.now().plusDays(2);
-        Todo taskToUpdate = new Todo(0L, "Original Title", false, initialDueDate);
+        Priority initialPriority = Priority.LOW;
+        Todo taskToUpdate = new Todo(0L, "Original Title", false, initialDueDate, initialPriority);
         taskToUpdate = todoRepository.save(taskToUpdate);
         Long taskId = taskToUpdate.getId();
 
         LocalDate newDueDate = LocalDate.now().plusDays(7);
         String formattedNewDueDate = newDueDate.format(DateTimeFormatter.ISO_DATE);
+        Priority newPriority = Priority.HIGH;
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("title", "Updated Title via POST");
         params.add("dueDate", formattedNewDueDate);
+        params.add("priority", newPriority.name());
 
         mockMvc.perform(post("/update/" + taskId)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -164,12 +197,40 @@ public class TodoControllerIntegrationTest {
         assertTrue(updatedTaskOptional.isPresent());
         assertEquals("Updated Title via POST", updatedTaskOptional.get().getTitle());
         assertEquals(newDueDate, updatedTaskOptional.get().getDueDate());
+        assertEquals(newPriority, updatedTaskOptional.get().getPriority());
+    }
+
+    @Test
+    void testPostUpdateId_withNoPriority_shouldRetainExistingPriority() throws Exception {
+        LocalDate initialDueDate = LocalDate.now().plusDays(2);
+        Priority initialPriority = Priority.HIGH;
+        Todo taskToUpdate = new Todo(0L, "Original Title", false, initialDueDate, initialPriority);
+        taskToUpdate = todoRepository.save(taskToUpdate);
+        Long taskId = taskToUpdate.getId();
+
+        String formattedNewDueDate = LocalDate.now().plusDays(5).format(DateTimeFormatter.ISO_DATE);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("title", "Updated Title Only");
+        params.add("dueDate", formattedNewDueDate);
+        // No priority parameter sent
+
+        mockMvc.perform(post("/update/" + taskId)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .params(params))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+
+        Optional<Todo> taskAfterUpdate = todoRepository.findById(taskId);
+        assertTrue(taskAfterUpdate.isPresent());
+        assertEquals("Updated Title Only", taskAfterUpdate.get().getTitle());
+        assertEquals(initialPriority, taskAfterUpdate.get().getPriority()); // Priority should remain unchanged
     }
 
     @Test
     void testPostUpdateId_shouldNotUpdateIfTitleIsEmptyAndRedirect() throws Exception {
         LocalDate initialDueDate = LocalDate.now().plusDays(2);
-        Todo taskToUpdate = new Todo(0L, "Original Title", false, initialDueDate);
+        Priority initialPriority = Priority.MEDIUM;
+        Todo taskToUpdate = new Todo(0L, "Original Title", false, initialDueDate, initialPriority);
         taskToUpdate = todoRepository.save(taskToUpdate);
         Long taskId = taskToUpdate.getId();
 
@@ -178,6 +239,7 @@ public class TodoControllerIntegrationTest {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("title", "  "); // Empty title
         params.add("dueDate", formattedNewDueDate);
+        params.add("priority", Priority.HIGH.name());
 
 
         mockMvc.perform(post("/update/" + taskId)
@@ -190,13 +252,14 @@ public class TodoControllerIntegrationTest {
         assertTrue(taskAfterUpdate.isPresent());
         assertEquals("Original Title", taskAfterUpdate.get().getTitle()); // Title should not change
         assertEquals(initialDueDate, taskAfterUpdate.get().getDueDate()); // Due date should also not change
+        assertEquals(initialPriority, taskAfterUpdate.get().getPriority()); // Priority should also not change
     }
 
     @Test
-    void testGetIndex_shouldDisplayDueDateAndHighlightOverdueTasks() throws Exception {
+    void testGetIndex_shouldDisplayDueDateAndHighlightOverdueTasksAndPriority() throws Exception {
         LocalDate today = LocalDate.now();
-        Todo overdueTask = new Todo(0L, "Overdue Task", false, today.minusDays(1));
-        Todo upcomingTask = new Todo(0L, "Upcoming Task", false, today.plusDays(2));
+        Todo overdueTask = new Todo(0L, "Overdue Task", false, today.minusDays(1), Priority.HIGH);
+        Todo upcomingTask = new Todo(0L, "Upcoming Task", false, today.plusDays(2), Priority.LOW);
         todoRepository.save(overdueTask);
         todoRepository.save(upcomingTask);
 
@@ -204,14 +267,10 @@ public class TodoControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"))
                 .andExpect(content().string(containsString("Overdue Task")))
-                .andExpect(content().string(containsString("task-overdue"))) // Check for overdue class for "Overdue Task"
+                .andExpect(content().string(containsString("task-overdue")))
+                .andExpect(xpath("//li[contains(.,'Overdue Task')]//span[contains(@class, 'badge-danger') and text()='High']").exists())
                 .andExpect(content().string(containsString("Upcoming Task")))
-                // Check that "Upcoming Task" itself does not have task-overdue.
-                // This is tricky with containsString if "task-overdue" appears elsewhere for the "Overdue Task".
-                // A more precise XPath could be: xpath("//li[contains(span/text(), 'Upcoming Task') and not(contains(@class, 'task-overdue'))]").exists()
-                // For now, ensure the line with "Upcoming Task" does not also get "task-overdue" if possible,
-                // or accept this limitation if "task-overdue" for "Overdue Task" makes this pass incorrectly.
-                // Given current structure, we rely on the fact that "Upcoming Task" row will not contain "task-overdue".
-                .andExpect(xpath("//li[contains(.,'Upcoming Task') and not(contains(@class, 'task-overdue'))]").exists());
+                .andExpect(xpath("//li[contains(.,'Upcoming Task') and not(contains(@class, 'task-overdue'))]").exists())
+                .andExpect(xpath("//li[contains(.,'Upcoming Task')]//span[contains(@class, 'badge-info') and text()='Low']").exists());
     }
 }

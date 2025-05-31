@@ -8,11 +8,15 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
 
 ## Features
 
-- **Add Tasks:** Quickly add new todo items.
-- **Edit Tasks:** Modify the title of existing tasks.
+- **Add Tasks:** Quickly add new todo items with titles, optional due dates, and priority levels.
+- **Edit Tasks:** Modify the title, due date, and priority of existing tasks.
 - **Complete Tasks:** Mark tasks as completed with a single click.
 - **Delete Tasks:** Remove tasks that are no longer needed.
-- **Persistent Task Storage:** Tasks are saved in an H2 in-memory database.
+- **Due Dates:** Assign due dates to tasks to keep track of deadlines.
+- **Visual Reminders for Due Dates:** Overdue tasks are visually highlighted in the task list.
+- **Task Prioritization:** Assign priority levels (High, Medium, Low) to tasks.
+- **Priority Display:** Task priorities are clearly displayed, often with color-coding (e.g., High - Red, Medium - Yellow, Low - Blue).
+- **Persistent Task Storage:** Tasks are saved in an H2 in-memory database, with console access enabled for development.
 - **Dark Themed UI:** Enjoy a visually appealing interface with a sleek black background.
 
 ## Technology Stack
@@ -22,6 +26,7 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
 - **Spring Data JPA**
 - **Maven**
 - **Thymeleaf**
+- **Thymeleaf Extras Java8Time** (for date formatting in templates)
 - **H2 Database**
 - **Docker**
 
@@ -61,9 +66,16 @@ After the build, the packaged JAR will be located in the `target` directory (e.g
 
 ## Docker
 
-This project includes both a multi-stage `Dockerfile` and a `docker-compose.yml` file to build and run the application in a containerized environment.
+This project is configured for containerization using Docker, providing a consistent environment for building and running the application.
+
+- **Optimized Build Context:** A `.dockerignore` file is utilized to exclude unnecessary files (like `.git`, `target/`, IDE configurations) from the Docker build context, ensuring faster and leaner builds.
 
 ### Using the Dockerfile
+
+The `Dockerfile` implements a multi-stage build strategy:
+1.  A `builder` stage uses a Maven/JDK image (`maven:3.8.5-openjdk-17`) to compile the Java application and build the executable JAR. This stage leverages Docker's layer caching for dependencies by first copying the `pom.xml` and downloading dependencies before copying the source code.
+2.  A final, lean runtime stage uses a JRE image (`openjdk:17-jre-alpine`) for a significantly reduced image size.
+3.  For improved security, the application in the final stage runs as a non-root user (`appuser`).
 
 #### Building the Docker Image
 
@@ -85,13 +97,17 @@ The application will be accessible at [http://localhost:8081](http://localhost:8
 
 ### Using Docker Compose
 
-Docker Compose makes it even easier to manage the container lifecycle. From the project root, run:
+The `docker-compose.yml` file provides a simple way to build and run the application service:
+- It uses the local `Dockerfile` for building.
+- An explicit image name (`night-todo-app-compose:latest`) is defined for the built image.
+- It maps port `8081` on the host to port `8081` in the container.
 
+To build and run with Docker Compose:
 ```bash
 docker-compose up --build
 ```
 
-This command will build the image (if needed) and start the container, making the application available at [http://localhost:8081](http://localhost:8081). To stop the container, use:
+The application will be accessible at [http://localhost:8081](http://localhost:8081). To stop and remove the container:
 
 ```bash
 docker-compose down
