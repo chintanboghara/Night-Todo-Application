@@ -5,15 +5,40 @@ import com.example.todo.model.Todo;
 import com.example.todo.service.TodoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+
 import java.time.LocalDate;
+import java.util.List; // Added for ReorderRequestPayload
 import java.util.Optional;
 
 @Controller
 public class TodoController {
+
+    // Static inner class for the reorder request payload
+    public static class ReorderRequestPayload {
+        private List<Long> orderedTaskIds;
+        private Long parentId; // Can be null for top-level tasks
+
+        public List<Long> getOrderedTaskIds() {
+            return orderedTaskIds;
+        }
+
+        public void setOrderedTaskIds(List<Long> orderedTaskIds) {
+            this.orderedTaskIds = orderedTaskIds;
+        }
+
+        public Long getParentId() {
+            return parentId;
+        }
+
+        public void setParentId(Long parentId) {
+            this.parentId = parentId;
+        }
+    }
 
   @Autowired
   private TodoService todoService;
@@ -111,5 +136,14 @@ public class TodoController {
       todoService.addSubTask(parentId, title, dueDate, priority);
     }
     return "redirect:/"; // Consider redirecting to parent task anchor: "/#task-" + parentId
+  }
+
+  @PostMapping("/todos/reorder")
+  public ResponseEntity<Void> reorderTasks(@RequestBody ReorderRequestPayload payload) {
+      if (payload == null || payload.getOrderedTaskIds() == null) {
+          return ResponseEntity.badRequest().build(); // Basic validation
+      }
+      todoService.updateTaskOrder(payload.getOrderedTaskIds(), payload.getParentId());
+      return ResponseEntity.ok().build();
   }
 }

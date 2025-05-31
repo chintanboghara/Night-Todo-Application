@@ -3,6 +3,7 @@ package com.example.todo.controller;
 import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.repository.TodoRepository;
+import com.fasterxml.jackson.databind.ObjectMapper; // Added for JSON serialization
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,10 @@ public class TodoControllerIntegrationTest {
     @Autowired
     private TodoRepository todoRepository;
 
-    private Todo task1;
+    @Autowired
+    private ObjectMapper objectMapper; // Added for JSON serialization
+
+    private Todo task1; // This seems unused, can be removed if setupFilterSortTestData is always used
 
     @BeforeEach
     void setUp() {
@@ -444,20 +448,21 @@ public class TodoControllerIntegrationTest {
     }
 
     @Test
-    void testDefaultLoad_SortsByCreationDateAsc() throws Exception {
-        setupFilterSortTestData();
+    void testDefaultLoad_SortsByDisplayOrderAsc() throws Exception {
+        setupFilterSortTestData(); // Tasks are created with displayOrder 0, 1, 2, 3, 4, 5, 6
         mockMvc.perform(get("/"))
             .andExpect(status().isOk())
-            .andExpect(model().attribute("currentSortBy", "creationDate")) // Default sort
+            .andExpect(model().attribute("currentSortBy", "displayOrder")) // Default sort is now displayOrder
             .andExpect(model().attribute("currentSortDir", "ASC"))
-            // Expected order: Charlie, Delta, Bravo, Alpha, Foxtrot, Echo, Golf
-            .andExpect(xpath("//ul/li[1][contains(.,'Task Charlie')]").exists())
-            .andExpect(xpath("//ul/li[2][contains(.,'Task Delta')]").exists())
-            .andExpect(xpath("//ul/li[3][contains(.,'Task Bravo')]").exists())
-            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())
-            .andExpect(xpath("//ul/li[5][contains(.,'Task Foxtrot')]").exists())
-            .andExpect(xpath("//ul/li[6][contains(.,'Task Echo')]").exists())
-            .andExpect(xpath("//ul/li[7][contains(.,'Task Golf')]").exists());
+            // Expected order based on sequential creation in setupFilterSortTestData:
+            // Charlie (0), Delta (1), Bravo (2), Alpha (3), Foxtrot (4), Echo (5), Golf (6)
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[1][contains(.,'Task Charlie')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[2][contains(.,'Task Delta')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[3][contains(.,'Task Bravo')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[4][contains(.,'Task Alpha')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[5][contains(.,'Task Foxtrot')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[6][contains(.,'Task Echo')]").exists())
+            .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[7][contains(.,'Task Golf')]").exists());
     }
 
     @Test
@@ -721,5 +726,167 @@ public class TodoControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(xpath("//p[contains(.,'This is a subtask of:')]//strong[text()='Main Project Task']").exists())
             .andExpect(xpath("//p//a[contains(text(),'(Edit Parent)') and @href='/edit/" + parentTask.getId() + "']").exists());
+    }
+
+    // --- Tests for /todos/reorder endpoint ---
+
+    @Test
+    void testReorderTasks_topLevel_shouldUpdateDisplayOrderAndReflectInView() throws Exception {
+        // Setup: Create 3 top-level tasks. Their initial displayOrder will be 0, 1, 2.
+        Todo t1 = createAndSaveTodo("Task 1 Original Order 0", false, null, Priority.MEDIUM, null); // displayOrder 0
+        Todo t2 = createAndSaveTodo("Task 2 Original Order 1", false, null, Priority.MEDIUM, null); // displayOrder 1
+        Todo t3 = createAndSaveTodo("Task 3 Original Order 2", false, null, Priority.MEDIUM, null); // displayOrder 2
+
+        TodoController.ReorderRequestPayload payload = new TodoController.ReorderRequestPayload();
+        payload.setOrderedTaskIds(Arrays.asList(t3.getId(), t1.getId(), t2.getId())); // New order: t3, t1, t2
+        payload.setParentId(null);
+
+        mockMvc.perform(post("/todos/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isOk());
+
+        // Verify displayOrder in DB
+        assertEquals(0, todoRepository.findById(t3.getId()).get().getDisplayOrder());
+        assertEquals(1, todoRepository.findById(t1.getId()).get().getDisplayOrder());
+        assertEquals(2, todoRepository.findById(t2.getId()).get().getDisplayOrder());
+
+        // Verify HTML order on GET /
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[1][contains(.,'Task 3')]").exists())
+                .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[2][contains(.,'Task 1')]").exists())
+                .andExpect(xpath("//ul[contains(@class,'sortable-list') and not(contains(@class,'subtask-list'))]/li[3][contains(.,'Task 2')]").exists());
+    }
+
+    @Test
+    void testReorderTasks_subtasks_shouldUpdateDisplayOrderAndReflectInView() throws Exception {
+        Todo parent = createAndSaveTodo("Parent Task", false, null, Priority.HIGH, null);
+        Todo s1 = createAndSaveTodo("Subtask 1 Original Order 0", false, null, Priority.MEDIUM, parent); // displayOrder 0
+        Todo s2 = createAndSaveTodo("Subtask 2 Original Order 1", false, null, Priority.MEDIUM, parent); // displayOrder 1
+        Todo s3 = createAndSaveTodo("Subtask 3 Original Order 2", false, null, Priority.MEDIUM, parent); // displayOrder 2
+
+        TodoController.ReorderRequestPayload payload = new TodoController.ReorderRequestPayload();
+        payload.setOrderedTaskIds(Arrays.asList(s3.getId(), s1.getId(), s2.getId())); // New order: s3, s1, s2
+        payload.setParentId(parent.getId());
+
+        mockMvc.perform(post("/todos/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isOk());
+
+        assertEquals(0, todoRepository.findById(s3.getId()).get().getDisplayOrder());
+        assertEquals(1, todoRepository.findById(s1.getId()).get().getDisplayOrder());
+        assertEquals(2, todoRepository.findById(s2.getId()).get().getDisplayOrder());
+
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//li[@data-task-id='" + parent.getId() + "']//ul[@class='subtask-list list-unstyled sortable-list']/li[1][contains(.,'Subtask 3')]").exists())
+            .andExpect(xpath("//li[@data-task-id='" + parent.getId() + "']//ul[@class='subtask-list list-unstyled sortable-list']/li[2][contains(.,'Subtask 1')]").exists())
+            .andExpect(xpath("//li[@data-task-id='" + parent.getId() + "']//ul[@class='subtask-list list-unstyled sortable-list']/li[3][contains(.,'Subtask 2')]").exists());
+    }
+
+    @Test
+    void testReorderTasks_invalidPayload_shouldReturnBadRequest() throws Exception {
+        TodoController.ReorderRequestPayload payload = new TodoController.ReorderRequestPayload();
+        payload.setOrderedTaskIds(null); // Invalid: missing orderedTaskIds
+
+        mockMvc.perform(post("/todos/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testReorderTasks_taskNotFound_shouldHandleGracefullyAndReorderExisting() throws Exception {
+        Todo t1 = createAndSaveTodo("Task 1 Exists", false, null, Priority.MEDIUM, null);
+        Todo t2 = createAndSaveTodo("Task 2 Exists", false, null, Priority.MEDIUM, null);
+
+        TodoController.ReorderRequestPayload payload = new TodoController.ReorderRequestPayload();
+        // Order: t1, then a non-existent task, then t2
+        payload.setOrderedTaskIds(Arrays.asList(t1.getId(), 9999L, t2.getId()));
+        payload.setParentId(null);
+
+        mockMvc.perform(post("/todos/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isOk()); // Service handles this gracefully
+
+        // Existing tasks should be reordered based on their presence in the list
+        // t1 is at index 0, t2 is at index 2 (but after 999L is skipped, it's effectively index 1)
+        assertEquals(0, todoRepository.findById(t1.getId()).get().getDisplayOrder());
+        assertEquals(1, todoRepository.findById(t2.getId()).get().getDisplayOrder());
+    }
+
+    @Test
+    void testReorderTasks_taskDoesNotMatchParentContext_shouldHandleGracefully() throws Exception {
+        Todo topLevelTask = createAndSaveTodo("Top Level Task", false, null, Priority.MEDIUM, null); // displayOrder 0
+        Todo parentForSubtask = createAndSaveTodo("Parent For Subtask", false, null, Priority.HIGH, null); // displayOrder 1
+        Todo subtask = createAndSaveTodo("Subtask", false, null, Priority.LOW, parentForSubtask); // displayOrder 0 (for this parent)
+
+        TodoController.ReorderRequestPayload payload = new TodoController.ReorderRequestPayload();
+        // Attempt to reorder topLevelTask and subtask as if they are both top-level
+        payload.setOrderedTaskIds(Arrays.asList(subtask.getId(), topLevelTask.getId()));
+        payload.setParentId(null);
+
+        mockMvc.perform(post("/todos/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isOk());
+
+        // topLevelTask should be reordered (it's the only one matching parentId=null context)
+        // Its new order will be 0 as it's the first valid task in the list for this context.
+        assertEquals(0, todoRepository.findById(topLevelTask.getId()).get().getDisplayOrder());
+        // subtask's displayOrder should remain unchanged (0 relative to its parent) as it was skipped
+        assertEquals(0, todoRepository.findById(subtask.getId()).get().getDisplayOrder());
+        assertNotNull(todoRepository.findById(subtask.getId()).get().getParent()); // ensure it's still a subtask
+    }
+
+
+    // --- Test @OrderBy on subTasks collection ---
+    @Test
+    void testParentEntity_loadsSubtasks_inDisplayOrder() throws Exception {
+        Todo parent = createAndSaveTodo("Parent With Unordered Subtasks", false, null, Priority.HIGH, null);
+
+        // Create subtasks and save them deliberately out of displayOrder sequence
+        // Service's addSubTask sets displayOrder, so we manually set and save for test
+        Todo sub2 = new Todo();
+        sub2.setTitle("Subtask B");
+        sub2.setParent(parent);
+        sub2.setDisplayOrder(1); // Explicitly set order
+        todoRepository.save(sub2);
+
+        Todo sub1 = new Todo();
+        sub1.setTitle("Subtask A");
+        sub1.setParent(parent);
+        sub1.setDisplayOrder(0); // Explicitly set order
+        todoRepository.save(sub1);
+
+        Todo sub3 = new Todo();
+        sub3.setTitle("Subtask C");
+        sub3.setParent(parent);
+        sub3.setDisplayOrder(2); // Explicitly set order
+        todoRepository.save(sub3);
+
+        // Fetch the parent task
+        Optional<Todo> fetchedParentOptional = todoRepository.findById(parent.getId());
+        assertTrue(fetchedParentOptional.isPresent());
+        Todo fetchedParent = fetchedParentOptional.get();
+
+        // Access subTasks - @OrderBy should ensure they are sorted by displayOrder
+        List<Todo> subTasks = fetchedParent.getSubTasks();
+        assertNotNull(subTasks);
+        assertEquals(3, subTasks.size());
+        assertEquals("Subtask A", subTasks.get(0).getTitle()); // Expected order 0
+        assertEquals(0, subTasks.get(0).getDisplayOrder());
+        assertEquals("Subtask B", subTasks.get(1).getTitle()); // Expected order 1
+        assertEquals(1, subTasks.get(1).getDisplayOrder());
+        assertEquals("Subtask C", subTasks.get(2).getTitle()); // Expected order 2
+        assertEquals(2, subTasks.get(2).getDisplayOrder());
     }
 }

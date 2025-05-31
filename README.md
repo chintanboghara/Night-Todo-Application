@@ -29,6 +29,11 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
     - **Search by Title:** Quickly find tasks by typing keywords from their title.
     - **Sort Tasks:** Arrange tasks by 'Creation Date', 'Due Date', 'Priority', or 'Title'.
     - **Sort Direction:** Choose between 'Ascending' or 'Descending' order for all sort options.
+- **Drag-and-Drop Task Reordering:** Intuitively change the order of tasks by dragging and dropping them within their current list.
+    - **Manual Sorting:** Easily set a custom display order for top-level tasks and for subtasks within their respective parent.
+    - **Persistent Order:** Your custom task order is saved and will be remembered.
+    - **Default View:** Tasks are displayed in your manually set order by default when no other column-specific sorting (like by due date or priority) is active.
+    - **Interaction with Column Sorting:** If you sort tasks by a specific column (e.g., 'Due Date'), that sort takes precedence. However, for items with the same value in the sorted column (e.g., multiple tasks with the same due date), their relative manual order is maintained (stable sort).
 - **Persistent Task Storage:** Tasks (including parent-child relationships) are saved in an H2 in-memory database, with console access enabled for development.
 - **Dark Themed UI:** Enjoy a visually appealing interface with a sleek black background.
 
@@ -40,6 +45,7 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
 - **Maven**
 - **Thymeleaf**
 - **Thymeleaf Extras Java8Time** (for date formatting in templates)
+- **SortableJS** (for drag-and-drop UI)
 - **H2 Database**
 - **Docker**
 

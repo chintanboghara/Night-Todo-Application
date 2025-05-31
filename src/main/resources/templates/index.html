@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <title>Todo Application</title>
+  <meta name="_csrf" th:content="${_csrf.token}"/>
+  <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
   <link rel="stylesheet" type="text/css" href="/css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <style th:inline="text">
     .add-form div {
       margin-bottom: 10px;
@@ -196,10 +199,12 @@
 
     <!-- Task List Fragment Definition -->
     <div th:fragment="taskList(tasksToDisplay, isSubtask)" th:remove="tag">
-        <ul th:class="${isSubtask} ? 'subtask-list list-unstyled' : 'list-unstyled'">
+        <ul th:class="${isSubtask} ? 'subtask-list list-unstyled sortable-list' : 'list-unstyled sortable-list'"
+            th:attr="data-parent-id=${isSubtask && tasksToDisplay != null && !tasksToDisplay.isEmpty() && tasksToDisplay[0].parent != null ? tasksToDisplay[0].parent.id : ''}">
             <li th:each="task : ${tasksToDisplay}"
-                th:id="'task-' + ${task.id}"
-                th:classappend="${task.overdue ? 'task-overdue' : ''} + ' ' + ${task.completed ? 'task-completed' : ''}">
+                th:id="'task-item-' + ${task.id}"
+                th:attr="data-task-id=${task.id}"
+                th:classappend="${task.overdue ? 'task-overdue' : ''} + ' ' + ${task.completed ? 'task-completed' : ''} + ' list-group-item'"> <!-- Added list-group-item for Sortable styling consistency if needed -->
 
                 <span th:text="${task.title}"
                       th:classappend="${task.completed} ? 'completed' : ''"></span> <!-- 'completed' class on span for strikethrough -->
@@ -235,8 +240,75 @@
     </div>
 
     <!-- Initial call to the task list fragment for top-level todos -->
-    <div th:replace="~{index :: taskList(tasksToDisplay=${todos}, isSubtask=false)}"></div>
+    <div th:replace="~{index :: taskList(tasksToDisplay=${todos}, isSubtask=false)}" class="top-level-sortable-list-container"></div>
 
   </div>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+document.addEventListener('DOMContentLoaded', function () {
+    const sortableLists = document.querySelectorAll('.sortable-list');
+
+    sortableLists.forEach(listEl => {
+        new Sortable(listEl, {
+            animation: 150,
+            group: 'shared-tasks', // Using a group name allows dragging between lists (if desired and configured)
+                                   // For now, primarily for reordering within the same list.
+            // handle: '.task-handle', // Optional: specify a drag handle if you add an element with this class
+            onEnd: function (evt) {
+                const itemEl = evt.item; // Dragged HTMLElement
+                const listElement = evt.to; // The list element where the item was dropped
+
+                let parentId = listElement.dataset.parentId;
+                if (parentId === "" || parentId === undefined || parentId === null) {
+                    parentId = null;
+                } else {
+                    parentId = parseInt(parentId, 10);
+                }
+
+                const orderedTaskIds = Array.from(listElement.children).map(child => {
+                    // Ensure we are getting the ID from the correct attribute, e.g., data-task-id
+                    return parseInt(child.dataset.taskId, 10);
+                });
+
+                const payload = {
+                    orderedTaskIds: orderedTaskIds,
+                    parentId: parentId
+                };
+
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeaderName = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                headers[csrfHeaderName] = csrfToken;
+
+                fetch('/todos/reorder', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error('Failed to reorder tasks. Server responded with status:', response.status);
+                        // Consider a more user-friendly error display or revert mechanism
+                        alert('Error reordering tasks. Please refresh the page to see the correct order.');
+                    } else {
+                        console.log('Tasks reordered successfully.');
+                        // Optional: success feedback or UI refresh if needed,
+                        // though SortableJS provides optimistic UI update.
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending reorder request:', error);
+                    alert('Error reordering tasks. Please refresh the page to see the correct order.');
+                });
+            }
+        });
+    });
+});
+/*]]>*/
+</script>
 </body>
 </html>
