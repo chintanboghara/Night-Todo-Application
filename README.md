@@ -22,6 +22,13 @@ Night Todo Application is a sleek, modern, and dark-themed Todo application buil
     - Subtasks are displayed hierarchically indented under their parent task.
     - Subtasks can be managed (completed, edited, deleted) independently.
     - Deleting a parent task automatically deletes all its associated subtasks (cascade deletion).
+- **Advanced Filtering and Sorting:** Easily find and organize tasks with comprehensive filtering and sorting options available directly on the main task view.
+    - **Filter by Status:** View all tasks, or only 'Pending' or 'Completed' ones.
+    - **Filter by Priority:** Focus on tasks based on their 'High', 'Medium', or 'Low' priority.
+    - **Filter by Due Date:** Narrow down tasks by criteria like 'Overdue', 'Today', 'Next 7 Days', or a specific date.
+    - **Search by Title:** Quickly find tasks by typing keywords from their title.
+    - **Sort Tasks:** Arrange tasks by 'Creation Date', 'Due Date', 'Priority', or 'Title'.
+    - **Sort Direction:** Choose between 'Ascending' or 'Descending' order for all sort options.
 - **Persistent Task Storage:** Tasks (including parent-child relationships) are saved in an H2 in-memory database, with console access enabled for development.
 - **Dark Themed UI:** Enjoy a visually appealing interface with a sleek black background.
 

@@ -7,10 +7,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.ArrayList; // Added this import
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -28,32 +32,186 @@ public class TodoServiceTest {
     @InjectMocks
     private TodoService todoService;
 
-    private Todo todo1;
-    private Todo todo2;
+    // ArgumentCaptors for Specification and Sort to be used in multiple tests
+    private ArgumentCaptor<Specification<Todo>> specCaptor;
+    private ArgumentCaptor<Sort> sortCaptor;
+    private Todo todo1; // Keep for existing tests, can be removed if those tests are refactored
+    private Todo todo2; // Keep for existing tests
 
     @BeforeEach
     void setUp() {
+        specCaptor = ArgumentCaptor.forClass(Specification.class);
+        sortCaptor = ArgumentCaptor.forClass(Sort.class);
+        // Common stubbing for findAll for getTodos tests
+        // Individual tests can override this if they need to check the returned list
+        when(todoRepository.findAll(specCaptor.capture(), sortCaptor.capture())).thenReturn(new ArrayList<>());
+
+        // Setup for existing tests, can be refactored if those tests change significantly
         todo1 = new Todo();
         todo1.setId(1L);
         todo1.setTitle("Test Task 1");
         todo1.setCompleted(false);
+        todo1.setPriority(Priority.MEDIUM);
+
 
         todo2 = new Todo();
         todo2.setId(2L);
         todo2.setTitle("Test Task 2");
         todo2.setCompleted(true);
+        todo2.setPriority(Priority.HIGH);
+    }
+
+    // --- Tests for getTodos ---
+
+    @Test
+    void getTodos_defaultParameters_shouldSortByCreationDateAsc() {
+        todoService.getTodos(null, null, null, null, null, null); // All null or default
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("creationDate").getDirection());
+        assertNotNull(specCaptor.getValue());
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
 
     @Test
-    void getTodos_shouldReturnListOfTopLevelTasks() { // Renamed for clarity
-        when(todoRepository.findByParentIsNull()).thenReturn(Arrays.asList(todo1, todo2));
+    void getTodos_explicitDefaultParameters_shouldSortByCreationDateAsc() {
+        todoService.getTodos("ALL", null, "ALL", "", "creationDate", "ASC");
 
-        List<Todo> todos = todoService.getTodos();
-
-        assertEquals(2, todos.size());
-        assertEquals("Test Task 1", todos.get(0).getTitle());
-        verify(todoRepository, times(1)).findByParentIsNull();
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("creationDate").getDirection());
+        assertNotNull(specCaptor.getValue());
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
     }
+
+    @Test
+    void getTodos_sortByTitleDesc_shouldApplyCorrectSort() {
+        todoService.getTodos(null, null, null, null, "title", "DESC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("title").getDirection());
+        assertNull(capturedSort.getOrderFor("creationDate"));
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    @Test
+    void getTodos_sortByDueDateAsc_shouldApplyCorrectSort() {
+        todoService.getTodos(null, null, null, null, "dueDate", "ASC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("dueDate").getDirection());
+        assertNull(capturedSort.getOrderFor("creationDate"));
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    @Test
+    void getTodos_sortByPriorityDesc_shouldApplyCorrectSort() {
+        todoService.getTodos(null, null, null, null, "priority", "DESC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("priority").getDirection());
+        assertNull(capturedSort.getOrderFor("creationDate"));
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    @Test
+    void getTodos_invalidSortBy_shouldDefaultToCreationDateWithProvidedDirection() {
+        todoService.getTodos(null, null, null, null, "invalidField", "DESC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("creationDate").getDirection());
+        assertNull(capturedSort.getOrderFor("invalidField"));
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    @Test
+    void getTodos_invalidSortDir_shouldDefaultToAscForSpecifiedField() {
+        todoService.getTodos(null, null, null, null, "title", "INVALID_DIR");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.ASC, capturedSort.getOrderFor("title").getDirection());
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    // Tests for filters (focus on repository call, not spec details)
+    @Test
+    void getTodos_withFilterByStatusCompleted_callsRepository() {
+        todoService.getTodos("COMPLETED", null, null, null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByStatusPending_callsRepository() {
+        todoService.getTodos("PENDING", null, null, null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByPriorityHigh_callsRepository() {
+        todoService.getTodos(null, Priority.HIGH, null, null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByDueDateOverdue_callsRepository() {
+        todoService.getTodos(null, null, "OVERDUE", null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByDueDateToday_callsRepository() {
+        todoService.getTodos(null, null, "TODAY", null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByDueDateNext7Days_callsRepository() {
+        todoService.getTodos(null, null, "NEXT_7_DAYS", null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByDueDateSpecificDate_callsRepository() {
+        todoService.getTodos(null, null, "2024-01-15", null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withFilterByDueDateInvalidDateKeyword_callsRepository() {
+        todoService.getTodos(null, null, "INVALID_KEYWORD", null, null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withSearchTerm_callsRepository() {
+        todoService.getTodos(null, null, null, "my search term", null, null);
+        verify(todoRepository).findAll(specCaptor.capture(), any(Sort.class));
+        assertNotNull(specCaptor.getValue());
+    }
+
+    @Test
+    void getTodos_withCombinedFiltersAndSort_callsRepositoryWithCorrectSort() {
+        // Reset captors for this specific call to ensure clean capture
+        specCaptor = ArgumentCaptor.forClass(Specification.class);
+        sortCaptor = ArgumentCaptor.forClass(Sort.class);
+        when(todoRepository.findAll(specCaptor.capture(), sortCaptor.capture())).thenReturn(new ArrayList<>());
+
+        todoService.getTodos("PENDING", Priority.MEDIUM, "TODAY", "search", "priority", "DESC");
+
+        Sort capturedSort = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, capturedSort.getOrderFor("priority").getDirection());
+        assertNotNull(specCaptor.getValue());
+        verify(todoRepository).findAll(any(Specification.class), any(Sort.class));
+    }
+
+    // --- End of tests for getTodos ---
 
     @Test
     void addTodo_shouldSaveAndReturnTodoWithPriority() {

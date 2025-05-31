@@ -274,6 +274,294 @@ public class TodoControllerIntegrationTest {
                 .andExpect(xpath("//li[contains(.,'Upcoming Task')]//span[contains(@class, 'badge-info') and text()='Low']").exists());
     }
 
+    // Helper method to create and save a Todo item
+    private Todo createAndSaveTodo(String title, boolean completed, LocalDate dueDate, Priority priority, Todo parent) {
+        Todo todo = new Todo(0L, title, completed, dueDate, priority);
+        if (parent != null) {
+            todo.setParent(parent);
+        }
+        // Simulate PrePersist if not handled by test environment (usually is)
+        if (todo.getCreationDate() == null) {
+            todo.setCreationDate(java.time.LocalDateTime.now());
+        }
+        return todoRepository.save(todo);
+    }
+
+    // --- Filter and Sort Tests ---
+    private void setupFilterSortTestData() {
+        // Ensure a clean slate
+        todoRepository.deleteAll();
+
+        // Create tasks one by one to have a predictable creation order for sorting by creationDate
+        // All creationDate times will be distinct and in this order.
+        // To make creationDate sorting more robust if tests run very fast, small delays could be added,
+        // or creationDate set manually if @PrePersist logic allows overriding (e.g. if null).
+        // For now, assume persistence order is sufficient.
+
+        // Task 1 (Oldest creation date)
+        createAndSaveTodo("Task Charlie (Due Earlier, Low, Completed)", true, LocalDate.now().minusDays(5), Priority.LOW, null);
+        // Task 2
+        createAndSaveTodo("Task Delta (Overdue, Medium, Pending)", false, LocalDate.now().minusDays(2), Priority.MEDIUM, null);
+        // Task 3
+        createAndSaveTodo("Task Bravo (Due Today, Medium, Pending)", false, LocalDate.now(), Priority.MEDIUM, null);
+        // Task 4
+        createAndSaveTodo("Task Alpha (Due Later, High, Pending)", false, LocalDate.now().plusDays(5), Priority.HIGH, null);
+        // Task 5
+        createAndSaveTodo("Task Foxtrot (Due Next Week, Low, Pending)", false, LocalDate.now().plusDays(7), Priority.LOW, null);
+        // Task 6
+        createAndSaveTodo("Task Echo (No Due Date, High, Pending)", false, null, Priority.HIGH, null);
+        // Task 7 (New specific date task for testing, Newest creation date)
+        createAndSaveTodo("Task Golf (Specific Date, Medium, Pending)", false, LocalDate.now().plusYears(1).withMonth(3).withDay(15), Priority.MEDIUM, null);
+
+        // Expected order for default sort (creationDate ASC): Charlie, Delta, Bravo, Alpha, Foxtrot, Echo, Golf
+        // Expected order for creationDate DESC: Golf, Echo, Foxtrot, Alpha, Bravo, Delta, Charlie
+    }
+
+    @Test
+    void testFilterByStatus_Pending() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByStatus", "PENDING"))
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Bravo')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Charlie (Due Earlier, Low, Completed)')]").doesNotExist())
+                .andExpect(xpath("//li[contains(.,'Task Delta')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Echo')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Foxtrot')]").exists());
+    }
+
+    @Test
+    void testFilterByStatus_Completed() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByStatus", "COMPLETED"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByStatus", "COMPLETED"))
+                .andExpect(xpath("//li[contains(.,'Task Charlie (Due Earlier, Low, Completed)')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").doesNotExist());
+    }
+
+    @Test
+    void testFilterByPriority_High() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByPriority", "HIGH"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByPriority", Priority.HIGH))
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Echo')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Bravo')]").doesNotExist());
+    }
+
+    @Test
+    void testFilterByDueDate_Overdue() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByDueDate", "OVERDUE"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByDueDate", "OVERDUE"))
+                .andExpect(xpath("//li[contains(.,'Task Delta (Overdue, Medium, Pending)')]").exists())
+                // Task Charlie is also overdue by date, but it's completed.
+                // The isOverdue() spec itself doesn't check for completion status.
+                // So, if ONLY filterByDueDate=OVERDUE is applied, Charlie should be listed.
+                // If filterByStatus=PENDING is also applied, then Charlie would be excluded.
+                // Let's assume for this specific test, we only care about the due date logic.
+                .andExpect(xpath("//li[contains(.,'Task Charlie (Due Earlier, Low, Completed)')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").doesNotExist());
+    }
+
+    @Test
+    void testFilterByDueDate_Today() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByDueDate", "TODAY"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByDueDate", "TODAY"))
+                .andExpect(xpath("//li[contains(.,'Task Bravo (Due Today, Medium)')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").doesNotExist());
+    }
+
+    @Test
+    void testFilterByDueDate_Next7Days() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("filterByDueDate", "NEXT_7_DAYS"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentFilterByDueDate", "NEXT_7_DAYS"))
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").exists()) // Due in 5 days
+                .andExpect(xpath("//li[contains(.,'Task Bravo')]").exists()) // Due today
+                .andExpect(xpath("//li[contains(.,'Task Foxtrot')]").exists()) // Due in 7 days
+                .andExpect(xpath("//li[contains(.,'Task Delta')]").doesNotExist()); // Overdue
+    }
+
+    @Test
+    void testSearchTerm() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("searchTerm", "Alpha"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentSearchTerm", "Alpha"))
+                .andExpect(xpath("//li[contains(.,'Task Alpha')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Bravo')]").doesNotExist());
+    }
+
+    @Test
+    void testSortByTitle_ASC() throws Exception {
+        setupFilterSortTestData(); // Alpha, Bravo, Charlie, Delta, Echo, Foxtrot
+        mockMvc.perform(get("/").param("sortBy", "title").param("sortDir", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("currentSortBy", "title"))
+                .andExpect(model().attribute("currentSortDir", "ASC"))
+                .andExpect(xpath("//ul/li[1][contains(.,'Task Alpha')]").exists())
+                .andExpect(xpath("//ul/li[2][contains(.,'Task Bravo')]").exists())
+                .andExpect(xpath("//ul/li[3][contains(.,'Task Charlie')]").exists());
+    }
+
+    @Test
+    void testSortByTitle_DESC() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/").param("sortBy", "title").param("sortDir", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(xpath("//ul/li[1][contains(.,'Task Foxtrot')]").exists())
+                .andExpect(xpath("//ul/li[2][contains(.,'Task Echo')]").exists());
+    }
+
+    @Test
+    void testCombinedFiltersAndSort() throws Exception {
+        setupFilterSortTestData();
+        // Pending, High priority, sorted by Due Date ASC
+        mockMvc.perform(get("/")
+                .param("filterByStatus", "PENDING")
+                .param("filterByPriority", "HIGH")
+                .param("sortBy", "dueDate")
+                .param("sortDir", "ASC"))
+                .andExpect(status().isOk())
+                // Expected: Task Echo (null), Task Alpha (High, due +5d). Both are PENDING and HIGH.
+                // Nulls are typically last in ASC sort for dates in H2/PostgreSQL unless specified.
+                // Let's verify this behavior or adjust if H2 behaves differently by default.
+                // If H2 default is NULLS FIRST for ASC: Echo, Alpha
+                // If H2 default is NULLS LAST for ASC: Alpha, Echo
+                // The TodoSpecification does not specify null handling for sort, so it's DB dependent.
+                // For H2, Sort.by("dueDate").ascending() typically means NULLS LAST.
+                .andExpect(xpath("//ul/li[1][contains(.,'Task Alpha (Due Later, High, Pending)')]").exists())
+                .andExpect(xpath("//ul/li[2][contains(.,'Task Echo (No Due Date, High, Pending)')]").exists())
+                .andExpect(xpath("//li[contains(.,'Task Bravo')]").doesNotExist()); // Medium priority
+    }
+
+    @Test
+    void testDefaultLoad_SortsByCreationDateAsc() throws Exception {
+        setupFilterSortTestData();
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("currentSortBy", "creationDate")) // Default sort
+            .andExpect(model().attribute("currentSortDir", "ASC"))
+            // Expected order: Charlie, Delta, Bravo, Alpha, Foxtrot, Echo, Golf
+            .andExpect(xpath("//ul/li[1][contains(.,'Task Charlie')]").exists())
+            .andExpect(xpath("//ul/li[2][contains(.,'Task Delta')]").exists())
+            .andExpect(xpath("//ul/li[3][contains(.,'Task Bravo')]").exists())
+            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())
+            .andExpect(xpath("//ul/li[5][contains(.,'Task Foxtrot')]").exists())
+            .andExpect(xpath("//ul/li[6][contains(.,'Task Echo')]").exists())
+            .andExpect(xpath("//ul/li[7][contains(.,'Task Golf')]").exists());
+    }
+
+    @Test
+    void testFilterByDueDate_SpecificDate() throws Exception {
+        setupFilterSortTestData();
+        LocalDate specificTestDate = LocalDate.now().plusYears(1).withMonth(3).withDay(15);
+        String specificDateStr = specificTestDate.format(DateTimeFormatter.ISO_DATE);
+
+        mockMvc.perform(get("/").param("filterByDueDate", specificDateStr))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("currentFilterByDueDate", specificDateStr))
+            .andExpect(xpath("//li[contains(.,'Task Golf (Specific Date, Medium, Pending)')]").exists())
+            .andExpect(xpath("//li[contains(.,'Task Alpha')]").doesNotExist());
+    }
+
+    @Test
+    void testSortByDueDate_ASC() throws Exception {
+        setupFilterSortTestData(); // Echo (null), Charlie (-5d), Delta (-2d), Bravo (today), Alpha (+5d), Foxtrot (+7d), Golf (+1y)
+        mockMvc.perform(get("/").param("sortBy", "dueDate").param("sortDir", "ASC"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("currentSortBy", "dueDate"))
+            .andExpect(model().attribute("currentSortDir", "ASC"))
+            // H2 default: NULLS LAST for ASC sort
+            .andExpect(xpath("//ul/li[1][contains(.,'Task Charlie')]").exists()) // -5d
+            .andExpect(xpath("//ul/li[2][contains(.,'Task Delta')]").exists())   // -2d
+            .andExpect(xpath("//ul/li[3][contains(.,'Task Bravo')]").exists())   // today
+            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())   // +5d
+            .andExpect(xpath("//ul/li[5][contains(.,'Task Foxtrot')]").exists()) // +7d
+            .andExpect(xpath("//ul/li[6][contains(.,'Task Golf')]").exists())    // +1y
+            .andExpect(xpath("//ul/li[7][contains(.,'Task Echo')]").exists());   // null
+    }
+
+    @Test
+    void testSortByDueDate_DESC() throws Exception {
+        setupFilterSortTestData(); // Echo (null), Golf (+1y), Foxtrot (+7d), Alpha (+5d), Bravo (today), Delta (-2d), Charlie (-5d)
+        mockMvc.perform(get("/").param("sortBy", "dueDate").param("sortDir", "DESC"))
+            .andExpect(status().isOk())
+            // H2 default: NULLS FIRST for DESC sort
+            .andExpect(xpath("//ul/li[1][contains(.,'Task Echo')]").exists())    // null
+            .andExpect(xpath("//ul/li[2][contains(.,'Task Golf')]").exists())    // +1y
+            .andExpect(xpath("//ul/li[3][contains(.,'Task Foxtrot')]").exists()) // +7d
+            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())   // +5d
+            .andExpect(xpath("//ul/li[5][contains(.,'Task Bravo')]").exists())   // today
+            .andExpect(xpath("//ul/li[6][contains(.,'Task Delta')]").exists())   // -2d
+            .andExpect(xpath("//ul/li[7][contains(.,'Task Charlie')]").exists()); // -5d
+    }
+
+    @Test
+    void testSortByPriority_ASC() throws Exception {
+        setupFilterSortTestData(); // Priorities: LOW, MEDIUM, MEDIUM, HIGH, LOW, HIGH, MEDIUM
+                                   // Sorted by Enum Ordinal: HIGH (0), MEDIUM (1), LOW (2)
+                                   // ASC should be HIGH, HIGH, MEDIUM, MEDIUM, MEDIUM, LOW, LOW
+        mockMvc.perform(get("/").param("sortBy", "priority").param("sortDir", "ASC"))
+            .andExpect(status().isOk())
+            // Checking first few based on expected HIGH values, then a MEDIUM
+            .andExpect(xpath("//ul/li[1][contains(@class, 'priority-high')]").exists())
+            .andExpect(xpath("//ul/li[2][contains(@class, 'priority-high')]").exists())
+            .andExpect(xpath("//ul/li[3][contains(@class, 'priority-medium')]").exists());
+            // Full list: Alpha(H), Echo(H), Bravo(M), Delta(M), Golf(M), Charlie(L), Foxtrot(L)
+            // This requires names to align with priorities for this XPath to work or more complex model assertion
+    }
+
+    @Test
+    void testSortByPriority_DESC() throws Exception {
+        setupFilterSortTestData(); // DESC should be LOW, LOW, MEDIUM, MEDIUM, MEDIUM, HIGH, HIGH
+        mockMvc.perform(get("/").param("sortBy", "priority").param("sortDir", "DESC"))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//ul/li[1][contains(@class, 'priority-low')]").exists())
+            .andExpect(xpath("//ul/li[2][contains(@class, 'priority-low')]").exists())
+            .andExpect(xpath("//ul/li[3][contains(@class, 'priority-medium')]").exists());
+            // Full list: Charlie(L), Foxtrot(L), Bravo(M), Delta(M), Golf(M), Alpha(H), Echo(H)
+    }
+
+    @Test
+    void testSortByCreationDate_ASC() throws Exception {
+        setupFilterSortTestData();
+        // Expected order (as created): Charlie, Delta, Bravo, Alpha, Foxtrot, Echo, Golf
+        mockMvc.perform(get("/").param("sortBy", "creationDate").param("sortDir", "ASC"))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//ul/li[1][contains(.,'Task Charlie')]").exists())
+            .andExpect(xpath("//ul/li[2][contains(.,'Task Delta')]").exists())
+            .andExpect(xpath("//ul/li[3][contains(.,'Task Bravo')]").exists())
+            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())
+            .andExpect(xpath("//ul/li[5][contains(.,'Task Foxtrot')]").exists())
+            .andExpect(xpath("//ul/li[6][contains(.,'Task Echo')]").exists())
+            .andExpect(xpath("//ul/li[7][contains(.,'Task Golf')]").exists());
+    }
+
+    @Test
+    void testSortByCreationDate_DESC() throws Exception {
+        setupFilterSortTestData();
+        // Expected order (reverse of creation): Golf, Echo, Foxtrot, Alpha, Bravo, Delta, Charlie
+        mockMvc.perform(get("/").param("sortBy", "creationDate").param("sortDir", "DESC"))
+            .andExpect(status().isOk())
+            .andExpect(xpath("//ul/li[1][contains(.,'Task Golf')]").exists())
+            .andExpect(xpath("//ul/li[2][contains(.,'Task Echo')]").exists())
+            .andExpect(xpath("//ul/li[3][contains(.,'Task Foxtrot')]").exists())
+            .andExpect(xpath("//ul/li[4][contains(.,'Task Alpha')]").exists())
+            .andExpect(xpath("//ul/li[5][contains(.,'Task Bravo')]").exists())
+            .andExpect(xpath("//ul/li[6][contains(.,'Task Delta')]").exists())
+            .andExpect(xpath("//ul/li[7][contains(.,'Task Charlie')]").exists());
+    }
+
+
     // --- Subtask Tests ---
 
     @Test

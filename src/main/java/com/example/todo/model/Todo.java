@@ -10,8 +10,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.PrePersist;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 // Priority Enum is in the same package
@@ -36,6 +38,15 @@ public class Todo {
 
   @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<Todo> subTasks = new ArrayList<>();
+
+  private LocalDateTime creationDate;
+
+  @PrePersist
+  protected void onCreate() {
+    if (creationDate == null) {
+      creationDate = LocalDateTime.now();
+    }
+  }
 
   public Todo() {
     this.priority = Priority.MEDIUM; // Default priority
@@ -104,6 +115,14 @@ public class Todo {
 
   public void setSubTasks(List<Todo> subTasks) {
     this.subTasks = subTasks;
+  }
+
+  public LocalDateTime getCreationDate() {
+    return creationDate;
+  }
+
+  public void setCreationDate(LocalDateTime creationDate) {
+    this.creationDate = creationDate;
   }
 
   // Utility methods for managing subtasks

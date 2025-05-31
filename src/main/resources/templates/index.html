@@ -4,13 +4,45 @@
   <meta charset="UTF-8" />
   <title>Todo Application</title>
   <link rel="stylesheet" type="text/css" href="/css/style.css" />
-  <style>
+  <style th:inline="text">
     .add-form div {
       margin-bottom: 10px;
     }
-    .add-form label {
+    .add-form label, .filter-sort-form label {
       margin-right: 5px;
+      font-weight: bold;
     }
+    .filter-sort-form .form-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    .filter-sort-form .form-group {
+        margin-right: 15px; /* Spacing between form groups */
+        margin-bottom: 5px; /* Spacing for wrapped items */
+    }
+    .filter-sort-form select, .filter-sort-form input[type="text"] {
+        padding: 5px;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+    }
+    .btn-filter, .btn-filter-clear {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        text-decoration: none;
+        margin-right: 10px;
+    }
+    .btn-filter {
+        background-color: #007bff;
+        color: white;
+    }
+    .btn-filter-clear {
+        background-color: #6c757d;
+        color: white;
+    }
+
     .task-overdue {
       color: red;
       /* font-weight: bold; */
@@ -77,6 +109,71 @@
 <body>
   <div class="container">
     <h1>Todo List</h1>
+
+    <hr/>
+    <h2>Filter & Sort Tasks</h2>
+    <form method="GET" th:action="@{/}" class="filter-sort-form mb-4">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="filterByStatus">Status:</label>
+                <select id="filterByStatus" name="filterByStatus">
+                    <option value="ALL" th:selected="${currentFilterByStatus == 'ALL'}">All Statuses</option>
+                    <option value="PENDING" th:selected="${currentFilterByStatus == 'PENDING'}">Pending</option>
+                    <option value="COMPLETED" th:selected="${currentFilterByStatus == 'COMPLETED'}">Completed</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="filterByPriority">Priority:</label>
+                <select id="filterByPriority" name="filterByPriority">
+                    <option value="" th:selected="${currentFilterByPriority == null}">All Priorities</option>
+                    <option th:each="p : ${priorities}"
+                            th:value="${p}"
+                            th:text="${p.name().substring(0,1) + p.name().substring(1).toLowerCase()}"
+                            th:selected="${p == currentFilterByPriority}">
+                    </option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="filterByDueDate">Due Date:</label>
+                <select id="filterByDueDate" name="filterByDueDate">
+                    <option value="ALL" th:selected="${currentFilterByDueDate == 'ALL'}">All Due Dates</option>
+                    <option value="OVERDUE" th:selected="${currentFilterByDueDate == 'OVERDUE'}">Overdue</option>
+                    <option value="TODAY" th:selected="${currentFilterByDueDate == 'TODAY'}">Today</option>
+                    <option value="NEXT_7_DAYS" th:selected="${currentFilterByDueDate == 'NEXT_7_DAYS'}">Next 7 Days</option>
+                    <!-- Consider adding specific date input here later if needed -->
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="searchTerm">Search:</label>
+                <input type="text" id="searchTerm" name="searchTerm" placeholder="Search by title..." th:value="${currentSearchTerm}" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="sortBy">Sort By:</label>
+                <select id="sortBy" name="sortBy">
+                    <option value="creationDate" th:selected="${currentSortBy == 'creationDate'}">Creation Date</option>
+                    <option value="dueDate" th:selected="${currentSortBy == 'dueDate'}">Due Date</option>
+                    <option value="priority" th:selected="${currentSortBy == 'priority'}">Priority</option>
+                    <option value="title" th:selected="${currentSortBy == 'title'}">Title</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sortDir">Direction:</label>
+                <select id="sortDir" name="sortDir">
+                    <option value="ASC" th:selected="${currentSortDir == 'ASC'}">Ascending</option>
+                    <option value="DESC" th:selected="${currentSortDir == 'DESC'}">Descending</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-filter">Apply Filters / Sort</button>
+        <a th:href="@{/}" class="btn-filter-clear">Clear Filters</a>
+    </form>
+    <hr/>
+
+    <h2>Add New Todo</h2>
     <form action="/add" method="post" class="add-form">
       <div>
         <label for="title">Title:</label>

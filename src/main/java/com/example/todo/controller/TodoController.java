@@ -19,8 +19,28 @@ public class TodoController {
   private TodoService todoService;
 
   @GetMapping("/")
-  public String index(Model model) {
-    model.addAttribute("todos", todoService.getTodos());
+  public String index(
+          @RequestParam(required = false, defaultValue = "ALL") String filterByStatus,
+          @RequestParam(required = false) Priority filterByPriority,
+          @RequestParam(required = false, defaultValue = "ALL") String filterByDueDate,
+          @RequestParam(required = false) String searchTerm,
+          @RequestParam(required = false, defaultValue = "creationDate") String sortBy,
+          @RequestParam(required = false, defaultValue = "ASC") String sortDir,
+          Model model
+  ) {
+    model.addAttribute("todos", todoService.getTodos(filterByStatus, filterByPriority, filterByDueDate, searchTerm, sortBy, sortDir));
+
+    // Add current filter/sort parameters to model for UI to reflect current state
+    model.addAttribute("currentFilterByStatus", filterByStatus);
+    model.addAttribute("currentFilterByPriority", filterByPriority);
+    model.addAttribute("currentFilterByDueDate", filterByDueDate);
+    model.addAttribute("currentSearchTerm", searchTerm);
+    model.addAttribute("currentSortBy", sortBy);
+    model.addAttribute("currentSortDir", sortDir);
+
+    // Add data for dropdowns
+    model.addAttribute("priorities", Priority.values()); // For priority filter dropdown
+
     return "index";
   }
 
