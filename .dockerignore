@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Maven
+target/
+mvnw
+mvnw.cmd
+.mvn/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+nbproject/ # NetBeans
+
+# Logs
+*.log
+logs/
+
+# Local data (if applicable, like H2 file db)
+data/
+
+# Documentation (optional, but good for lean runtime images)
+# *.md
+
+# Docker files (should not be part of the context they define)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Build files from buildpacks if used locally
+.cnb/
