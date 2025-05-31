@@ -4,6 +4,66 @@
   <meta charset="UTF-8" />
   <title>Todo Application</title>
   <link rel="stylesheet" type="text/css" href="/css/style.css" />
+  <style>
+    .add-form div {
+      margin-bottom: 10px;
+    }
+    .add-form label {
+      margin-right: 5px;
+    }
+    .task-overdue {
+      color: red;
+      /* font-weight: bold; */
+    }
+    .task-meta {
+      font-size: 0.9em;
+      color: #777;
+      margin-top: 3px;
+    }
+    .task-actions {
+      margin-top: 5px;
+    }
+    .button-link {
+      display: inline-block;
+      padding: 0.375rem 0.75rem;
+      font-size: 1rem;
+      font-weight: 400;
+      line-height: 1.5;
+      text-align: center;
+      text-decoration: none;
+      white-space: nowrap;
+      vertical-align: middle;
+      user-select: none;
+      border: 1px solid transparent;
+      border-radius: 0.25rem;
+      color: #fff;
+      background-color: #007bff; /* Blue, adjust as needed */
+      border-color: #007bff;
+      cursor: pointer;
+    }
+    .button-link:hover {
+      background-color: #0056b3;
+      border-color: #0056b3;
+      text-decoration: none;
+      color: #fff;
+    }
+    /* Badge styling */
+    .badge {
+      display: inline-block;
+      padding: .25em .4em;
+      font-size: 75%;
+      font-weight: 700;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: baseline;
+      border-radius: .25rem;
+      margin-left: 5px; /* Simulating ml-2 */
+    }
+    .badge-danger { color: #fff; background-color: #dc3545; } /* High priority */
+    .badge-warning { color: #212529; background-color: #ffc107; } /* Medium priority */
+    .badge-info { color: #fff; background-color: #17a2b8; } /* Low priority */
+  </style>
 </head>
 <body>
   <div class="container">
@@ -17,14 +77,26 @@
         <label for="dueDate">Due Date:</label>
         <input type="date" id="dueDate" name="dueDate" />
       </div>
+      <div>
+        <label for="priority">Priority:</label>
+        <select id="priority" name="priority">
+            <option value="MEDIUM" selected="selected">Medium</option> <!-- Default selected -->
+            <option value="HIGH">High</option>
+            <option value="LOW">Low</option>
+        </select>
+      </div>
       <button type="submit">Add</button>
     </form>
     <ul>
       <li th:each="todo : ${todos}" th:classappend="${todo.overdue} ? 'task-overdue' : ''">
         <span th:text="${todo.title}"
               th:classappend="${todo.completed} ? 'completed' : ''"></span>
-        <div class="task-meta" th:if="${todo.dueDate}">
-             <small>Due: <span th:text="${#temporals.format(todo.dueDate, 'MMM dd, yyyy')}"></span></small>
+        <div class="task-meta">
+             <small th:if="${todo.dueDate}">Due: <span th:text="${#temporals.format(todo.dueDate, 'MMM dd, yyyy')}"></span></small>
+             <span th:if="${todo.priority}" class="badge"
+                   th:text="${todo.priority.name().substring(0,1) + todo.priority.name().substring(1).toLowerCase()}"
+                   th:classappend="${ #strings.toString(todo.priority) == 'HIGH' ? 'badge-danger' : (#strings.toString(todo.priority) == 'MEDIUM' ? 'badge-warning' : 'badge-info')}">
+             </span>
         </div>
         <div class="task-actions">
             <form th:action="@{/complete}" method="post" style="display:inline;">

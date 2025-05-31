@@ -17,6 +17,16 @@
         <label for="dueDate">Due Date:</label>
         <input type="date" class="form-control" id="dueDate" name="dueDate" th:value="${todo.dueDate}" />
     </div>
+    <div class="form-group">
+        <label for="priority">Priority:</label>
+        <select class="form-control" id="priority" name="priority">
+            <option th:each="p : ${priorities}"
+                    th:value="${p}"
+                    th:text="${p.name().substring(0,1) + p.name().substring(1).toLowerCase()}"
+                    th:selected="${p == todo.priority}">
+            </option>
+        </select>
+    </div>
     <button type="submit" class="btn btn-primary">Update Task</button>
     <a href="/" class="btn btn-secondary">Cancel</a>
   </form>

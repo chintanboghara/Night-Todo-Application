@@ -1,11 +1,17 @@
 package com.example.todo.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
+// Import Priority Enum (already in the same package, so not strictly necessary for compilation,
+// but good for clarity and if it were in a different package)
+// import com.example.todo.model.Priority;
 
 @Entity
 public class Todo {
@@ -18,14 +24,19 @@ public class Todo {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
   private LocalDate dueDate;
 
+  @Enumerated(EnumType.STRING)
+  private Priority priority;
+
   public Todo() {
+    this.priority = Priority.MEDIUM; // Default priority
   }
 
-  public Todo(long id, String title, boolean completed, LocalDate dueDate) {
+  public Todo(long id, String title, boolean completed, LocalDate dueDate, Priority priority) {
     this.id = id;
     this.title = title;
     this.completed = completed;
     this.dueDate = dueDate;
+    this.priority = (priority != null) ? priority : Priority.MEDIUM; // Ensure non-null, default if necessary
   }
 
   public long getId() {
@@ -58,6 +69,14 @@ public class Todo {
 
   public void setDueDate(LocalDate dueDate) {
     this.dueDate = dueDate;
+  }
+
+  public Priority getPriority() {
+    return priority;
+  }
+
+  public void setPriority(Priority priority) {
+    this.priority = priority;
   }
 
   public boolean isOverdue() {

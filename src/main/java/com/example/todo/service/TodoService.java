@@ -1,5 +1,6 @@
 package com.example.todo.service;
 
+import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.repository.TodoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +23,14 @@ public class TodoService {
     return todoRepository.findAll();
   }
 
-  public Todo addTodo(String title, LocalDate dueDate) {
-    Todo todo = new Todo();
+  public Todo addTodo(String title, LocalDate dueDate, Priority priority) {
+    Todo todo = new Todo(); // Default priority (MEDIUM) is set by the constructor
     todo.setTitle(title);
     todo.setCompleted(false);
     todo.setDueDate(dueDate);
+    if (priority != null) { // Override default if a specific priority is provided
+        todo.setPriority(priority);
+    }
     return todoRepository.save(todo);
   }
 
@@ -42,11 +46,14 @@ public class TodoService {
     });
   }
 
-  public Optional<Todo> updateTodo(long id, String title, LocalDate dueDate) {
+  public Optional<Todo> updateTodo(long id, String title, LocalDate dueDate, Priority priority) {
     Optional<Todo> optionalTodo = todoRepository.findById(id);
     return optionalTodo.map(todo -> {
       todo.setTitle(title);
       todo.setDueDate(dueDate);
+      if (priority != null) { // Update priority only if a new one is provided
+        todo.setPriority(priority);
+      }
       return todoRepository.save(todo);
     });
   }

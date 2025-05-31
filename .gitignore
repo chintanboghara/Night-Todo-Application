@@ -1,4 +1,68 @@
-target/
+# Compiled class file
+*.class
+
+# Log file
 *.log
+logs/
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
+# Build directory
+target/
+build/
+bin/
+
+# IDEs
 .idea/
 *.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+nbproject/ # NetBeans
+.vscode/
+*.code-workspace
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+!/.mvn/wrapper/maven-wrapper.properties # Keep this if you commit mvnw scripts
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar # Keep this if you commit gradlew scripts
+!gradle-wrapper.properties
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*~
+*.swp
+
+# H2 Database files (if file-based persistence is used locally)
+*.mv.db
+*.trace.db
+data/ # If data is stored in a /data directory at root
+
+# CNB build files
+.cnb/

@@ -1,5 +1,6 @@
 package com.example.todo.controller;
 
+import com.example.todo.model.Priority;
 import com.example.todo.model.Todo;
 import com.example.todo.service.TodoService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +26,10 @@ public class TodoController {
 
   @PostMapping("/add")
   public String addTodo(@RequestParam("title") String title,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate) {
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                        @RequestParam(required = false) Priority priority) {
     if (title != null && !title.trim().isEmpty()) {
-      todoService.addTodo(title, dueDate);
+      todoService.addTodo(title, dueDate, priority);
     }
     return "redirect:/";
   }
@@ -49,6 +51,7 @@ public class TodoController {
     Optional<Todo> optionalTodo = todoService.findTodoById(id);
     if (optionalTodo.isPresent()) {
       model.addAttribute("todo", optionalTodo.get());
+      model.addAttribute("priorities", Priority.values()); // Add all priority values
       return "edit-todo";
     } else {
       return "redirect:/";
@@ -57,9 +60,10 @@ public class TodoController {
 
   @PostMapping("/update/{id}")
   public String updateTodo(@PathVariable long id, @RequestParam String title,
-                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate) {
+                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                         @RequestParam(required = false) Priority priority) {
     if (title != null && !title.trim().isEmpty()) {
-      todoService.updateTodo(id, title, dueDate);
+      todoService.updateTodo(id, title, dueDate, priority);
     }
     return "redirect:/";
   }
