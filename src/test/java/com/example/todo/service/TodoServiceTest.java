@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -55,18 +56,21 @@ public class TodoServiceTest {
 
     @Test
     void addTodo_shouldSaveAndReturnTodo() {
+        LocalDate dueDate = LocalDate.now().plusDays(5);
         Todo newTodo = new Todo();
         newTodo.setTitle("New Task");
         newTodo.setCompleted(false);
+        newTodo.setDueDate(dueDate);
 
         // ArgumentCaptor can be used if we need to assert properties of the object passed to save
         when(todoRepository.save(any(Todo.class))).thenReturn(newTodo);
 
-        Todo savedTodo = todoService.addTodo("New Task");
+        Todo savedTodo = todoService.addTodo("New Task", dueDate);
 
         assertNotNull(savedTodo);
         assertEquals("New Task", savedTodo.getTitle());
         assertFalse(savedTodo.isCompleted());
+        assertEquals(dueDate, savedTodo.getDueDate());
         verify(todoRepository, times(1)).save(any(Todo.class));
     }
 
@@ -100,23 +104,32 @@ public class TodoServiceTest {
     }
 
     @Test
-    void updateTodo_shouldUpdateTodoTitle() {
+    void updateTodo_shouldUpdateTodoTitleAndDueDate() {
+        LocalDate newDueDate = LocalDate.now().plusDays(10);
         when(todoRepository.findById(1L)).thenReturn(Optional.of(todo1));
-        when(todoRepository.save(any(Todo.class))).thenReturn(todo1);
+        // Ensure the save method is mocked to return the passed todo, which will have the updated fields
+        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        todoService.updateTodo(1L, "Updated Title");
 
-        assertEquals("Updated Title", todo1.getTitle());
+        Optional<Todo> updatedTodoOptional = todoService.updateTodo(1L, "Updated Title", newDueDate);
+
+        assertTrue(updatedTodoOptional.isPresent());
+        Todo updatedTodo = updatedTodoOptional.get();
+        assertEquals("Updated Title", updatedTodo.getTitle());
+        assertEquals(newDueDate, updatedTodo.getDueDate());
+
         verify(todoRepository, times(1)).findById(1L);
-        verify(todoRepository, times(1)).save(todo1);
+        verify(todoRepository, times(1)).save(any(Todo.class));
     }
 
     @Test
     void updateTodo_shouldDoNothingIfTodoNotFound() {
+        LocalDate newDueDate = LocalDate.now().plusDays(10);
         when(todoRepository.findById(3L)).thenReturn(Optional.empty());
 
-        todoService.updateTodo(3L, "Non Existent");
+        Optional<Todo> updatedTodoOptional = todoService.updateTodo(3L, "Non Existent", newDueDate);
 
+        assertFalse(updatedTodoOptional.isPresent());
         verify(todoRepository, times(1)).findById(3L);
         verify(todoRepository, never()).save(any(Todo.class));
     }

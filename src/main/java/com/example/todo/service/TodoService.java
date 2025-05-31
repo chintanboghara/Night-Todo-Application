@@ -5,6 +5,7 @@ import com.example.todo.repository.TodoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,10 +22,11 @@ public class TodoService {
     return todoRepository.findAll();
   }
 
-  public Todo addTodo(String title) {
+  public Todo addTodo(String title, LocalDate dueDate) {
     Todo todo = new Todo();
     todo.setTitle(title);
     todo.setCompleted(false);
+    todo.setDueDate(dueDate);
     return todoRepository.save(todo);
   }
 
@@ -40,11 +42,12 @@ public class TodoService {
     });
   }
 
-  public void updateTodo(long id, String title) {
+  public Optional<Todo> updateTodo(long id, String title, LocalDate dueDate) {
     Optional<Todo> optionalTodo = todoRepository.findById(id);
-    optionalTodo.ifPresent(todo -> {
+    return optionalTodo.map(todo -> {
       todo.setTitle(title);
-      todoRepository.save(todo);
+      todo.setDueDate(dueDate);
+      return todoRepository.save(todo);
     });
   }
 

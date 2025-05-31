@@ -3,10 +3,12 @@ package com.example.todo.controller;
 import com.example.todo.model.Todo;
 import com.example.todo.service.TodoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Controller
@@ -22,9 +24,10 @@ public class TodoController {
   }
 
   @PostMapping("/add")
-  public String addTodo(@RequestParam("title") String title) {
+  public String addTodo(@RequestParam("title") String title,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate) {
     if (title != null && !title.trim().isEmpty()) {
-      todoService.addTodo(title);
+      todoService.addTodo(title, dueDate);
     }
     return "redirect:/";
   }
@@ -53,9 +56,10 @@ public class TodoController {
   }
 
   @PostMapping("/update/{id}")
-  public String updateTodo(@PathVariable long id, @RequestParam String title) {
+  public String updateTodo(@PathVariable long id, @RequestParam String title,
+                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate) {
     if (title != null && !title.trim().isEmpty()) {
-      todoService.updateTodo(id, title);
+      todoService.updateTodo(id, title, dueDate);
     }
     return "redirect:/";
   }

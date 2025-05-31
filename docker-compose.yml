@@ -2,7 +2,11 @@ version: "3.8"
 
 services:
   night-todo:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: night-todo-app-compose:latest # Specify an image name and tag
     ports:
       - "8081:8081"
-    container_name: night-todo-application
+    container_name: night-todo-application # Optional: custom container name
+    # restart: unless-stopped # Optional: restart policy
