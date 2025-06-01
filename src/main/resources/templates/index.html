@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Todo Application</title>
-  <meta name="_csrf" th:content="${_csrf.token}"/>
-  <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
   <link rel="stylesheet" type="text/css" href="/css/style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <style th:inline="text">
@@ -200,7 +198,7 @@
     <!-- Task List Fragment Definition -->
     <div th:fragment="taskList(tasksToDisplay, isSubtask)" th:remove="tag">
         <ul th:class="${isSubtask} ? 'subtask-list list-unstyled sortable-list' : 'list-unstyled sortable-list'"
-            th:attr="data-parent-id=${isSubtask && tasksToDisplay != null && !tasksToDisplay.isEmpty() && tasksToDisplay[0].parent != null ? tasksToDisplay[0].parent.id : ''}">
+            th:attr="data-parent-id=${(isSubtask && tasksToDisplay != null && !tasksToDisplay.isEmpty() && tasksToDisplay[0] != null && tasksToDisplay[0].parent != null) ? tasksToDisplay[0].parent.id : ''}">
             <li th:each="task : ${tasksToDisplay}"
                 th:id="'task-item-' + ${task.id}"
                 th:attr="data-task-id=${task.id}"
@@ -276,13 +274,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     parentId: parentId
                 };
 
-                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-                const csrfHeaderName = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
-
                 const headers = {
                     'Content-Type': 'application/json'
                 };
-                headers[csrfHeaderName] = csrfToken;
+                // CSRF token is no longer sent as CSRF is disabled in SecurityConfig
+                // headers[csrfHeaderName] = csrfToken;
 
                 fetch('/todos/reorder', {
                     method: 'POST',

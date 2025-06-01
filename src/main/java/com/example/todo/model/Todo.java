@@ -37,7 +37,7 @@ public class Todo {
   @JoinColumn(name = "parent_id")
   private Todo parent;
 
-  @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.EAGER)
   @OrderBy("displayOrder ASC") // Added this annotation
   private List<Todo> subTasks = new ArrayList<>();
 

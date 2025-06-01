@@ -27,6 +27,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+    <!-- Spring Boot Starter Security for authentication and authorization -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
     <!-- Thymeleaf for server-side templating -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
